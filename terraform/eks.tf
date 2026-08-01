@@ -61,11 +61,34 @@ resource "aws_eks_cluster" "main" {
     subnet_ids              = concat(aws_subnet.public[*].id, aws_subnet.private[*].id)
     endpoint_private_access = true
     endpoint_public_access  = true
+    security_group_ids      = [aws_security_group.cluster.id]
   }
 
   tags = merge(local.common_tags, { Name = local.cluster_name })
 
   depends_on = [aws_iam_role_policy_attachment.eks_cluster_policy]
+}
+
+# ── Launch Template (carries the worker nodes' security group) ──────────────
+# aws_eks_node_group has no security_group_ids argument, so the nodes SG is
+# attached via a launch template instead. Instance type and scaling stay on
+# the node group; this template's only job is the SG attachment.
+
+resource "aws_launch_template" "nodes" {
+  name_prefix = "${local.name_prefix}-nodes-"
+
+  vpc_security_group_ids = [aws_security_group.nodes.id]
+
+  tag_specifications {
+    resource_type = "instance"
+    tags          = merge(local.common_tags, { Name = "${local.name_prefix}-node" })
+  }
+
+  tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # ── EKS Managed Node Group ────────────────────────────────────────────────────
@@ -77,6 +100,11 @@ resource "aws_eks_node_group" "main" {
   subnet_ids      = aws_subnet.private[*].id
 
   instance_types = [var.node_instance_type]
+
+  launch_template {
+    id      = aws_launch_template.nodes.id
+    version = "$Latest"
+  }
 
   scaling_config {
     desired_size = var.desired_node_count
