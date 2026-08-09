@@ -1,7 +1,7 @@
 variable "app_name" {
   description = "Application name used across all resources"
   type        = string
-  default     = "ecommerce-api"
+  default     = "flights-api"
 }
 
 variable "environment" {
@@ -24,7 +24,7 @@ variable "aws_region" {
 variable "docker_image" {
   description = "Full Docker image reference (registry/name:tag)"
   type        = string
-  default     = "myrepo/myapp:latest"
+  default     = "myrepo/flights-api:latest"
 }
 
 variable "node_instance_type" {

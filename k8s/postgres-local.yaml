@@ -5,7 +5,7 @@ metadata:
   name: postgres-config
   namespace: jenkins-argocd
 data:
-  POSTGRES_DB: ecommerce
+  POSTGRES_DB: flights
   POSTGRES_USER: user
 
 ---
@@ -71,12 +71,12 @@ spec:
               memory: "512Mi"
           livenessProbe:
             exec:
-              command: ["pg_isready", "-U", "user", "-d", "ecommerce"]
+              command: ["pg_isready", "-U", "user", "-d", "flights"]
             initialDelaySeconds: 10
             periodSeconds: 10
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", "user", "-d", "ecommerce"]
+              command: ["pg_isready", "-U", "user", "-d", "flights"]
             initialDelaySeconds: 5
             periodSeconds: 5
           volumeMounts:

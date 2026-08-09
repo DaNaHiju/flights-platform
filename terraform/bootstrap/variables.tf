@@ -1,7 +1,7 @@
 variable "project" {
   description = "Project name used to build the state bucket and lock table names"
   type        = string
-  default     = "ecommerce-api"
+  default     = "flights-api"
 }
 
 variable "aws_region" {

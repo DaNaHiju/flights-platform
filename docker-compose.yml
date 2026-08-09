@@ -6,29 +6,44 @@ services:
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: ecommerce
+      POSTGRES_DB: flights
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d ecommerce"]
+      test: ["CMD-SHELL", "pg_isready -U user -d flights"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
 
   api:
     build:
-      context: .
+      context: ./services/flights-api
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://user:password@postgres:5432/ecommerce
+      DATABASE_URL: postgresql://user:password@postgres:5432/flights
+      REDIS_URL: redis://redis:6379/0
+      FLIGHTS_CURRENCY: USD
+      FLIGHTS_DEFAULT_ORIGIN: TLV
       LOG_LEVEL: INFO
       ENVIRONMENT: development
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 

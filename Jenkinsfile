@@ -3,10 +3,11 @@ pipeline {
 
     environment {
         REGISTRY      = "myrepo"
-        IMAGE_NAME    = "myapp"
+        IMAGE_NAME    = "flights-api"
         IMAGE_TAG     = "${env.BUILD_NUMBER}"
         FULL_IMAGE    = "${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
         REGISTRY_CRED = credentials('docker-registry-credentials')
+        APP_DIR       = "services/flights-api"
     }
 
     options {
@@ -25,31 +26,35 @@ pipeline {
 
         stage('Lint') {
             steps {
-                sh '''
-                    pip install --quiet black pylint
-                    echo "==> Running black (format check)"
-                    black --check --diff app/
-                    echo "==> Running pylint"
-                    pylint app/ --fail-under=7.0
-                '''
+                dir(env.APP_DIR) {
+                    sh '''
+                        pip install --quiet black pylint
+                        echo "==> Running black (format check)"
+                        black --check --diff app/
+                        echo "==> Running pylint"
+                        pylint app/ --fail-under=7.0
+                    '''
+                }
             }
         }
 
         stage('Unit Tests') {
             steps {
-                sh '''
-                    pip install --quiet -r requirements.txt
-                    pytest tests/ \
-                        --cov=app \
-                        --cov-report=xml:coverage.xml \
-                        --cov-report=term-missing \
-                        -v
-                '''
+                dir(env.APP_DIR) {
+                    sh '''
+                        pip install --quiet -r requirements.txt
+                        pytest tests/ \
+                            --cov=app \
+                            --cov-report=xml:coverage.xml \
+                            --cov-report=term-missing \
+                            -v
+                    '''
+                }
             }
             post {
                 always {
-                    junit allowEmptyResults: true, testResults: 'test-results/*.xml'
-                    archiveArtifacts artifacts: 'coverage.xml', allowEmptyArchive: true
+                    junit allowEmptyResults: true, testResults: "${env.APP_DIR}/test-results/*.xml"
+                    archiveArtifacts artifacts: "${env.APP_DIR}/coverage.xml", allowEmptyArchive: true
                 }
             }
         }
@@ -61,7 +66,7 @@ pipeline {
                         --tag ${IMAGE_NAME}:${IMAGE_TAG} \
                         --label "git-commit=${env.GIT_COMMIT}" \
                         --label "build-number=${IMAGE_TAG}" \
-                        .
+                        ${APP_DIR}
                 """
             }
         }
@@ -100,7 +105,7 @@ pipeline {
                 )]) {
                     sh """
                         git clone https://${GIT_USER}:${GIT_TOKEN}@github.com/user/jenkins-argocd-manifests.git
-                        cd jenkins-argocd-manifests/helm/myapp
+                        cd jenkins-argocd-manifests/helm/flights-api
 
                         # Update image tag in values file
                         sed -i "s|tag:.*|tag: ${IMAGE_TAG}|" values.yaml

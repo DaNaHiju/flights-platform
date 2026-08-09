@@ -2,10 +2,11 @@
 
 PYTHON      := python3
 PIP         := pip3
-IMAGE_NAME  := myapp
+IMAGE_NAME  := flights-api
 IMAGE_TAG   := latest
 COMPOSE     := docker-compose
 TF_DIR      := terraform
+APP_DIR     := services/flights-api
 ALERT_EMAIL ?= your-email@example.com
 
 help:
@@ -19,17 +20,17 @@ help:
 	@echo "  budget-alarm  Create AWS Budget alarm at \$10 / 80% threshold"
 
 install:
-	$(PIP) install -r requirements.txt
+	$(PIP) install -r $(APP_DIR)/requirements.txt
 
 lint:
-	black --check --diff app/
-	pylint app/ --fail-under=7.0
+	black --check --diff $(APP_DIR)/app/
+	pylint $(APP_DIR)/app/ --fail-under=7.0
 
 test:
-	pytest tests/ --cov=app --cov-report=term-missing -v
+	cd $(APP_DIR) && pytest tests/ --cov=app --cov-report=term-missing -v
 
 build:
-	docker build -t $(IMAGE_NAME):$(IMAGE_TAG) .
+	docker build -t $(IMAGE_NAME):$(IMAGE_TAG) $(APP_DIR)
 
 run:
 	$(COMPOSE) up --build
@@ -42,6 +43,7 @@ kind-up:
 	kind create cluster --name jenkins-argocd
 	kubectl apply -f k8s/namespace.yaml
 	kubectl apply -f k8s/postgres-local.yaml
+	kubectl apply -f k8s/redis-local.yaml
 
 kind-down:
 	kind delete cluster --name jenkins-argocd
@@ -66,7 +68,7 @@ budget-alarm:
 	aws budgets create-budget \
 	  --account-id $$(aws sts get-caller-identity --query Account --output text) \
 	  --budget '{ \
-	    "BudgetName": "ecommerce-api-monthly-budget", \
+	    "BudgetName": "flights-api-monthly-budget", \
 	    "BudgetLimit": {"Amount": "10", "Unit": "USD"}, \
 	    "TimeUnit": "MONTHLY", \
 	    "BudgetType": "COST" \
