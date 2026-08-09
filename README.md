@@ -1,29 +1,37 @@
 # jenkins-argocd-platform
 
-CI/CD platform demo: FastAPI e-commerce API deployed to Kubernetes via Jenkins + ArgoCD (GitOps).
+CI/CD platform demo: FastAPI flights booking API deployed to Kubernetes via Jenkins + ArgoCD (GitOps). Flight data comes from [`fli`](https://github.com/punitarani/fli) (PyPI: `flights`), which retrieves live Google Flights results by reverse-engineering its internal endpoints — no API key, no official quota. See [docs/api-contract.md](docs/api-contract.md) for the full contract, including why Amadeus/Kiwi/Duffel were evaluated and discarded.
 
 **Repo 1 (this):** Application code, Dockerfile, Jenkinsfile, Terraform infrastructure.  
-**Repo 2 (separate):** [jenkins-argocd-manifests](https://github.com/user/jenkins-argocd-manifests) — Helm charts, ArgoCD Applications, staging/prod overlays.
+**Repo 2 (separate):** [jenkins-argocd-manifests](https://github.com/user/jenkins-argocd-manifests) — Helm charts, ArgoCD Applications, staging/prod overlays, and the CronJob that refreshes `/deals`.
 
 ---
 
 ## Architecture
 
 ```
-jenkins-argocd-platform/
-├── app/                  FastAPI e-commerce service (products, cart, orders)
-│   ├── api/              Route handlers
-│   ├── utils/            JSON logging + Prometheus metrics
-│   ├── models.py         Pydantic schemas + SQLAlchemy ORM
-│   ├── database.py       PostgreSQL connection (SQLAlchemy)
-│   └── config.py         Settings from environment variables
-├── tests/                pytest test suite (sqlite in-memory)
-├── Dockerfile            Multi-stage build (builder + slim runtime)
-├── docker-compose.yml    Local dev: app + PostgreSQL
-├── Jenkinsfile           CI pipeline: lint → test → build → push
-├── Makefile              Dev shortcuts + AWS budget alarm
-├── terraform/            AWS VPC + EKS (used in Project 2)
-└── k8s/                  Raw manifests for kind (local cluster)
+flights-platform/
+├── services/
+│   └── flights-api/           FastAPI flights booking service
+│       ├── app/
+│       │   ├── api/           Route handlers: flights, deals, bookings
+│       │   ├── jobs/          refresh_deals.py — invoked on a schedule by Repo 2's CronJob
+│       │   ├── utils/         JSON logging + Prometheus metrics
+│       │   ├── providers.py   fli (Google Flights) search wrapper
+│       │   ├── cache.py       Redis client + JSON cache helpers
+│       │   ├── models.py      Pydantic schemas + SQLAlchemy ORM
+│       │   ├── database.py    PostgreSQL connection (SQLAlchemy)
+│       │   └── config.py      Settings from environment variables
+│       ├── tests/             pytest test suite (sqlite in-memory, fli/Redis mocked)
+│       ├── Dockerfile         Multi-stage build (builder + slim runtime)
+│       └── requirements.txt
+├── docs/
+│   └── api-contract.md        Endpoints, schemas, env vars, caching strategy
+├── docker-compose.yml         Local dev: api + PostgreSQL + Redis
+├── Jenkinsfile                CI pipeline: lint → test → build → push
+├── Makefile                   Dev shortcuts + AWS budget alarm
+├── terraform/                 AWS VPC + EKS (used in Project 2)
+└── k8s/                       Raw manifests for kind (local cluster)
 ```
 
 **CI/CD flow:**
@@ -55,10 +63,11 @@ jenkins-argocd-platform/
 git clone https://github.com/user/jenkins-argocd-platform.git
 cd jenkins-argocd-platform
 
-# Start app + PostgreSQL
+# Start api + PostgreSQL + Redis
 docker-compose up --build
 
 # In a second terminal: run tests
+cd services/flights-api
 pip install -r requirements.txt
 pytest tests/ -v
 ```
@@ -72,13 +81,14 @@ Docs at http://localhost:8000/docs
 # 1. Create local cluster
 kind create cluster --name jenkins-argocd
 
-# 2. Apply base manifests (namespace + postgres)
+# 2. Apply base manifests (namespace + postgres + redis)
 kubectl apply -f k8s/namespace.yaml
 kubectl apply -f k8s/postgres-local.yaml
+kubectl apply -f k8s/redis-local.yaml
 
 # 3. Build and load image into kind
-docker build -t myapp:local .
-kind load docker-image myapp:local --name jenkins-argocd
+docker build -t flights-api:local services/flights-api
+kind load docker-image flights-api:local --name jenkins-argocd
 
 # 4. Verify postgres is ready
 kubectl -n jenkins-argocd rollout status statefulset/postgres
@@ -96,7 +106,7 @@ terraform plan
 terraform apply   # creates VPC + EKS
 
 # Get kubeconfig
-aws eks update-kubeconfig --region us-east-1 --name ecommerce-api-dev-eks
+aws eks update-kubeconfig --region us-east-1 --name flights-api-dev-eks
 
 # IMPORTANT: Always destroy when done to stop billing
 make destroy
@@ -107,17 +117,20 @@ make destroy
 ## Running tests
 
 ```bash
+cd services/flights-api
 pip install -r requirements.txt
 pytest tests/ -v --cov=app --cov-report=term-missing
 ```
+
+fli itself is never called in tests — `search_one_way` and the Redis client are mocked (see `tests/conftest.py`), so the suite runs fully offline.
 
 ---
 
 ## Linting
 
 ```bash
-black --check app/
-pylint app/ --fail-under=7.0
+black --check services/flights-api/app/
+pylint services/flights-api/app/ --fail-under=7.0
 
 # Or via make:
 make lint
@@ -128,10 +141,10 @@ make lint
 ## Building the Docker image
 
 ```bash
-docker build -t myapp:v1 .
+docker build -t flights-api:v1 services/flights-api
 
 # Verify health check
-docker run -e DATABASE_URL=sqlite:/// -p 8000:8000 myapp:v1
+docker run -e DATABASE_URL=sqlite:/// -p 8000:8000 flights-api:v1
 curl http://localhost:8000/health
 ```
 
@@ -142,16 +155,14 @@ curl http://localhost:8000/health
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Liveness probe |
+| GET | `/ready` | Readiness probe (Postgres + Redis) |
 | GET | `/metrics` | Prometheus metrics |
-| GET | `/products/` | List products |
-| POST | `/products/` | Create product |
-| GET | `/products/{id}` | Get product |
-| POST | `/cart/` | Add to cart |
-| GET | `/cart/?session_id=X` | View cart |
-| DELETE | `/cart/{item_id}` | Remove cart item |
-| POST | `/orders/` | Create order |
-| GET | `/orders/` | List orders |
-| GET | `/orders/{id}` | Get order |
+| GET | `/flights/?origin=&destination=&date=&adults=` | Search live one-way offers |
+| GET | `/deals/?limit=` | Top cached deals from `FLIGHTS_DEFAULT_ORIGIN` |
+| POST | `/bookings/` | Register a booking against a previously returned offer |
+| GET | `/bookings/{id}` | Get a booking |
+
+Full request/response schemas: [docs/api-contract.md](docs/api-contract.md).
 
 ---
 
@@ -168,10 +179,10 @@ curl http://localhost:8000/health
 ## Makefile targets
 
 ```bash
-make install       # pip install -r requirements.txt
+make install       # pip install -r services/flights-api/requirements.txt
 make lint          # black + pylint
 make test          # pytest with coverage
-make build         # docker build
+make build         # docker build (services/flights-api)
 make run           # docker-compose up
 make kind-up       # create kind cluster + apply k8s/
 make kind-down     # delete kind cluster
@@ -203,9 +214,16 @@ make budget-alarm  # create $10 AWS budget alert
 
 ---
 
+## Provider risk
+
+`fli` depends on an internal Google Flights endpoint, not a documented public API. Google can change its shape without notice, which would break search until `fli` is updated upstream. There's no SLA or quota to plan capacity against — see the open questions in [docs/api-contract.md](docs/api-contract.md).
+
+---
+
 ## Links
 
 - Repo 2 (manifests): https://github.com/user/jenkins-argocd-manifests
+- fli / flights on PyPI: https://github.com/punitarani/fli
 - FastAPI docs: https://fastapi.tiangolo.com
 - ArgoCD docs: https://argo-cd.readthedocs.io
 - kind docs: https://kind.sigs.k8s.io
