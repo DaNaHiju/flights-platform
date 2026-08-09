@@ -1,1 +1,1 @@
-"""Test suite for the e-commerce API."""
+"""Test suite for the flights API."""

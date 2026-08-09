@@ -26,7 +26,8 @@ ENV PATH=/root/.local/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
     LOG_LEVEL=INFO \
     ENVIRONMENT=production \
-    DATABASE_URL=postgresql://user:password@postgres:5432/ecommerce
+    DATABASE_URL=postgresql://user:password@postgres:5432/flights \
+    REDIS_URL=redis://redis:6379/0
 
 EXPOSE 8000
 

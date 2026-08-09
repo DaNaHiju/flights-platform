@@ -1,4 +1,4 @@
-"""Structured JSON logging setup for the e-commerce API."""
+"""Structured JSON logging setup for the flights API."""
 
 import logging
 import uuid

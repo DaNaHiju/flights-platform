@@ -1,4 +1,4 @@
-"""Prometheus metrics definitions for the e-commerce API."""
+"""Prometheus metrics definitions for the flights API."""
 
 from prometheus_client import Counter, Histogram
 
@@ -15,12 +15,12 @@ request_duration = Histogram(
     buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0],
 )
 
-orders_created = Counter(
-    "orders_created_total",
-    "Total number of orders successfully created",
+bookings_created = Counter(
+    "bookings_created_total",
+    "Total number of bookings successfully created",
 )
 
-inventory_updates = Counter(
-    "inventory_updates_total",
-    "Total number of product inventory updates",
+provider_errors = Counter(
+    "provider_errors_total",
+    "Total number of failed calls to fli (Google Flights)",
 )

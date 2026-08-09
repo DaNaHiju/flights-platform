@@ -3,13 +3,16 @@
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
-from fastapi.responses import PlainTextResponse
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, PlainTextResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
-from app.api import cart, orders, products
+from app import cache
+from app.api import bookings, deals, flights
 from app.config import settings
-from app.database import create_tables
+from app.database import create_tables, get_db
 from app.utils.logging import log
 from app.utils.metrics import request_count, request_duration
 
@@ -29,11 +32,25 @@ async def lifespan(application: FastAPI):
 
 
 app = FastAPI(
-    title="E-Commerce API",
-    description="FastAPI-based e-commerce backend for the jenkins-argocd-platform CI/CD demo.",
+    title="Flights API",
+    description="FastAPI booking service backed by fli (reverse-engineered Google Flights).",
     version=settings.APP_VERSION,
     lifespan=lifespan,
 )
+
+
+# ---------------------------------------------------------------------------
+# Error responses: contract error bodies are flat ({"error": "..."}), not
+# wrapped in FastAPI's default {"detail": ...} envelope.
+# ---------------------------------------------------------------------------
+
+
+@app.exception_handler(HTTPException)
+async def flat_http_exception_handler(request: Request, exc: HTTPException):
+    """Unwrap dict `detail` payloads so error bodies match docs/api-contract.md."""
+    content = exc.detail if isinstance(exc.detail, dict) else {"error": exc.detail}
+    return JSONResponse(status_code=exc.status_code, content=content)
+
 
 # ---------------------------------------------------------------------------
 # Middleware: track request metrics
@@ -67,13 +84,27 @@ async def metrics_middleware(request: Request, call_next):
 
 @app.get("/health", tags=["observability"])
 def health_check():
-    """Return service liveness status."""
-    return {
-        "status": "healthy",
-        "service": settings.APP_NAME,
-        "version": settings.APP_VERSION,
-        "environment": settings.ENVIRONMENT,
+    """Liveness only — must not touch Postgres or Redis. See /ready for that."""
+    return {"status": "ok"}
+
+
+@app.get("/ready", tags=["observability"])
+def readiness_check(db: Session = Depends(get_db)):
+    """Check PostgreSQL and Redis connectivity."""
+    postgres_ok = True
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:  # noqa: BLE001 — any DB failure means "not ready"
+        postgres_ok = False
+
+    redis_ok = cache.ping()
+
+    body = {
+        "postgres": "ok" if postgres_ok else "unreachable",
+        "redis": "ok" if redis_ok else "unreachable",
     }
+    status_code = 200 if postgres_ok and redis_ok else 503
+    return JSONResponse(status_code=status_code, content=body)
 
 
 @app.get("/metrics", response_class=PlainTextResponse, tags=["observability"])
@@ -89,6 +120,6 @@ def metrics():
 # Feature routers
 # ---------------------------------------------------------------------------
 
-app.include_router(products.router, prefix="/products", tags=["products"])
-app.include_router(cart.router, prefix="/cart", tags=["cart"])
-app.include_router(orders.router, prefix="/orders", tags=["orders"])
+app.include_router(flights.router, prefix="/flights", tags=["flights"])
+app.include_router(deals.router, prefix="/deals", tags=["deals"])
+app.include_router(bookings.router, prefix="/bookings", tags=["bookings"])

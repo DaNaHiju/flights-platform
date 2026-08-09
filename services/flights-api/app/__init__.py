@@ -1,1 +1,1 @@
-"""E-commerce API application package."""
+"""Flights API application package."""
