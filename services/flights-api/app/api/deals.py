@@ -15,7 +15,7 @@ router = APIRouter()
 DEALS_CACHE_KEY = "deals:top"
 
 
-@router.get("/")
+@router.get("")
 def list_deals(limit: int = Query(default=10, ge=1, le=50)):
     """Return the top cached deals, cheapest first."""
     cached = get_json(DEALS_CACHE_KEY)

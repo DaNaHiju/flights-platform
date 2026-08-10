@@ -22,7 +22,7 @@ def _search_cache_key(
     return f"search:{origin}:{destination}:{travel_date}:{adults}"
 
 
-@router.get("/")
+@router.get("")
 def search_flights(
     origin: str = Query(..., min_length=3, max_length=3),
     destination: str = Query(..., min_length=3, max_length=3),
