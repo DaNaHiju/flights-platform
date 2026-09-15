@@ -14,11 +14,7 @@ env/
 .env.local
 .env.*.local
 node_modules/
-terraform/**/.terraform/
-terraform/**/terraform.tfstate
-terraform/**/terraform.tfstate.backup
-terraform/**/.terraform.lock.hcl
-terraform/**/*.tfvars.local
+test.db
 .DS_Store
 *.swp
 *.swo

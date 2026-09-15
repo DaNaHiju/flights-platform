@@ -13,8 +13,5 @@ venv/
 tests/
 *.md
 .DS_Store
-terraform/
-k8s/
 docker-compose.yml
-Jenkinsfile
 Makefile
