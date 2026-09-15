@@ -3,8 +3,8 @@
 API de búsqueda y reserva de vuelos (FastAPI), repo de código de aplicación.
 
 **This repo:** Application code, Dockerfile.  
-**Infra repo:** [flights-platform-infra](https://github.com/user/flights-platform-infra) — Terraform (EKS, VPC, IAM, ECR, backend).  
-**Manifests repo:** [flights-platform-manifests](https://github.com/user/flights-platform-manifests) — Helm charts, ArgoCD Applications, staging/prod overlays, and the CronJob that refreshes `/deals`.
+**Infra repo:** [flights-platform-infra](https://github.com/danahiju/flights-platform-infra) — Terraform (EKS, VPC, IAM, ECR, backend).  
+**Manifests repo:** [flights-platform-manifests](https://github.com/danahiju/flights-platform-manifests) — Helm charts, ArgoCD Applications, staging/prod overlays, and the CronJob that refreshes `/deals`.
 
 ---
 
@@ -46,7 +46,7 @@ flights-platform/
 ## Running locally
 
 ```bash
-git clone https://github.com/user/flights-platform.git
+git clone https://github.com/danahiju/flights-platform.git
 cd flights-platform
 
 # Start api + PostgreSQL + Redis
@@ -145,8 +145,8 @@ make run           # docker-compose up
 
 ## Links
 
-- Infra repo: https://github.com/user/flights-platform-infra
-- Manifests repo: https://github.com/user/flights-platform-manifests
+- Infra repo: https://github.com/danahiju/flights-platform-infra
+- Manifests repo: https://github.com/danahiju/flights-platform-manifests
 - fli / flights on PyPI: https://github.com/punitarani/fli
 - FastAPI docs: https://fastapi.tiangolo.com
 - ArgoCD docs: https://argo-cd.readthedocs.io
