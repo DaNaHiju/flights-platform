@@ -3,7 +3,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-from app.config import settings
+from shared.config import settings
 
 engine = create_engine(
     settings.DATABASE_URL,
@@ -31,6 +31,6 @@ def get_db():
 def create_tables() -> None:
     """Create all tables defined in ORM models (idempotent)."""
     # Import here to ensure all models are registered before create_all
-    import app.models  # noqa: F401
+    import app.db_models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)

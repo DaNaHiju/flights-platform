@@ -2,7 +2,7 @@
 
 from fastapi.testclient import TestClient
 
-from app.cache import set_json
+from shared.cache import set_json
 
 RAW_OFFER = {
     "legs": [

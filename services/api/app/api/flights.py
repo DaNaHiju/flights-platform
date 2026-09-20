@@ -4,12 +4,12 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from app.cache import get_json, set_json
-from app.config import settings
-from app.models import flight_offer_from_raw
-from app.providers import ProviderUnavailableError, is_valid_iata, search_one_way
-from app.utils.logging import log
-from app.utils.metrics import provider_errors
+from shared.cache import get_json, set_json
+from shared.config import settings
+from shared.providers import ProviderUnavailableError, is_valid_iata, search_one_way
+from shared.schemas import flight_offer_from_raw
+from shared.utils.logging import log
+from shared.utils.metrics import provider_errors
 
 router = APIRouter()
 

@@ -12,22 +12,26 @@ API de búsqueda y reserva de vuelos (FastAPI), repo de código de aplicación.
 
 ```
 flights-platform/
+├── shared/                    Code shared across services (imported as `shared.*`)
+│   ├── utils/                 JSON logging + provider_errors metric
+│   ├── providers.py           fli (Google Flights) search wrapper
+│   ├── cache.py               Redis client + JSON cache helpers
+│   ├── schemas.py             Pydantic flight schemas (FlightOffer, Leg, Deal)
+│   └── config.py              Settings from environment variables
 ├── services/
 │   └── api/                   FastAPI flights booking service
 │       ├── app/
 │       │   ├── api/           Route handlers: flights, deals, bookings
 │       │   ├── jobs/          refresh_deals.py — invoked on a schedule by Repo 2's CronJob
-│       │   ├── utils/         JSON logging + Prometheus metrics
-│       │   ├── providers.py   fli (Google Flights) search wrapper
-│       │   ├── cache.py       Redis client + JSON cache helpers
-│       │   ├── models.py      Pydantic schemas + SQLAlchemy ORM
-│       │   ├── database.py    PostgreSQL connection (SQLAlchemy)
-│       │   └── config.py      Settings from environment variables
+│       │   ├── utils/         HTTP + bookings Prometheus metrics
+│       │   ├── db_models.py   SQLAlchemy ORM + booking schemas
+│       │   └── database.py    PostgreSQL connection (SQLAlchemy)
 │       ├── tests/             pytest test suite (sqlite in-memory, fli/Redis mocked)
 │       ├── Dockerfile         Multi-stage build (builder + slim runtime)
 │       └── requirements.txt
 ├── docs/
 │   └── api-contract.md        Endpoints, schemas, env vars, caching strategy
+├── pytest.ini                 Puts the repo root on the path so `shared` resolves
 ├── docker-compose.yml         Local dev: api + PostgreSQL + Redis
 └── Makefile                   Dev shortcuts
 ```
@@ -78,8 +82,8 @@ fli itself is never called in tests — `search_one_way` and the Redis client ar
 ## Linting
 
 ```bash
-black --check services/api/app/
-pylint services/api/app/ --fail-under=7.0
+black --check services/api/app/ shared/
+pylint services/api/app/ shared/ --fail-under=7.0
 
 # Or via make:
 make lint

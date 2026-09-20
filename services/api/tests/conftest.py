@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app import cache
+from shared import cache
 from app.database import Base, get_db
 from app.main import app
 

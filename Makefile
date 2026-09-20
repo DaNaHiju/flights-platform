@@ -20,11 +20,11 @@ install:
 	$(PIP) install -r $(APP_DIR)/requirements.txt
 
 lint:
-	black --check --diff $(APP_DIR)/app/
-	pylint $(APP_DIR)/app/ --fail-under=7.0
+	black --check --diff $(APP_DIR)/app/ shared/
+	pylint $(APP_DIR)/app/ shared/ --fail-under=7.0
 
 test:
-	cd $(APP_DIR) && pytest tests/ --cov=app --cov-report=term-missing -v
+	cd $(APP_DIR) && pytest tests/ --cov=app --cov=shared --cov-report=term-missing -v
 
 build:
 	docker build -t $(IMAGE_NAME):$(IMAGE_TAG) $(APP_DIR)

@@ -5,7 +5,7 @@ from typing import Any
 
 import redis
 
-from app.config import settings
+from shared.config import settings
 
 redis_client = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
 
