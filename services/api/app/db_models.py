@@ -34,7 +34,9 @@ class BookingORM(Base):
     contact_email = Column(Text, nullable=False)
     price_amount = Column(Numeric(10, 2), nullable=False)
     price_currency = Column(CHAR(3), nullable=False)
-    status = Column(Text, nullable=False, default="confirmed")
+    # Starts at the first state of recorded -> held -> charged -> confirmed | failed.
+    # Only "recorded" exists today (bookings are simulated); see docs/api-contract.md.
+    status = Column(Text, nullable=False, default="recorded")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

@@ -45,7 +45,7 @@ def test_create_booking_success(client: TestClient):
     response = client.post("/bookings/", json=VALID_PAYLOAD)
     assert response.status_code == 201
     data = response.json()
-    assert data["status"] == "confirmed"
+    assert data["status"] == "recorded"
     assert "booking_id" in data
     assert data["snapshot"]["offer_id"] == "TOKEN123"
     assert data["snapshot"]["price"] == 1839.0

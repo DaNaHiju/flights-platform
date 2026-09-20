@@ -194,7 +194,7 @@ body: { "offer_id": str,
 
         "contact_email": str }
 
-201 → { "booking_id": uuid, "status": "confirmed", "snapshot": FlightOffer }
+201 → { "booking_id": uuid, "status": "recorded", "snapshot": FlightOffer }
 
 400 → { "error": "invalid_passenger_data" }
 
@@ -226,13 +226,15 @@ CREATE TABLE bookings (
 
     price_currency  CHAR(3)     NOT NULL,
 
-    status          TEXT        NOT NULL DEFAULT 'confirmed',
+    status          TEXT        NOT NULL DEFAULT 'recorded',
 
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 
 );
 
 CREATE INDEX idx_bookings_email ON bookings (contact_email);
+
+`recorded` means this service persisted the booking intent. It is the only value today; the remaining states (held, charged, confirmed, failed) belong to the real integration described in "Scope: bookings are simulated".
 
 offer_snapshot stores the complete, untrimmed response returned by fli for that offer — not the trimmed FlightOffer shape described in section 3. Booking history stays readable even after the offer expires upstream, and the schema does not break when fli changes its response shape.
 
