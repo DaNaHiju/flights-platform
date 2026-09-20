@@ -160,7 +160,7 @@ string
 duration_minutes
 int
 
-fli additionally returns amenities, legroom, co2_emissions, aircraft, and layovers on the offer and on each leg. These are excluded from the public response — they're Google Flights' own presentation detail and add noise to the booking use case, which only needs price, schedule, and airline identity to search and confirm a seat.
+fli additionally returns amenities, legroom, co2_emissions, aircraft, and layovers on the offer and on each leg. These are excluded from the public response — they're Google Flights' own presentation detail and add noise to the booking use case, which only needs price, schedule, and airline identity to search offers and record a booking.
 GET /flights
 Search live offers. Served from Redis when the same query was made recently.
 
@@ -200,7 +200,7 @@ body: { "offer_id": str,
 
 409 → { "error": "offer_expired" }
 
-409 is the important case: fli booking tokens expire within minutes (exact window unverified, see open questions), and the platform does not own seat inventory. A booking records an intent with the offer data frozen at purchase time — it cannot guarantee the seat. This endpoint does not call fli — it only checks whether the offer is still sitting in the offer:{offer_id} cache written by GET /flights, so there is no provider_unavailable case here.
+409 is the important case: fli booking tokens expire within minutes (exact window unverified, see open questions), and the platform does not own seat inventory. A booking records an intent with the offer data frozen at booking time — it cannot guarantee the seat. This endpoint does not call fli — it only checks whether the offer is still sitting in the offer:{offer_id} cache written by GET /flights, so there is no provider_unavailable case here.
 GET /bookings/{booking_id}
 200 → Booking
 
