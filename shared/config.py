@@ -2,15 +2,32 @@
 
 import os
 
+# Connection strings have NO default on purpose: if one is missing the process
+# must stop at import time with a clear message, not fall back silently to
+# localhost and fail later with a confusing connection error.
+REQUIRED_ENV = ("DATABASE_URL", "REDIS_URL")
+
+
+def _check_required_env() -> None:
+    """Raise a clear error naming every required variable that is unset or empty."""
+    missing = [name for name in REQUIRED_ENV if not os.getenv(name)]
+    if missing:
+        raise RuntimeError(
+            f"Missing required environment variable(s): {', '.join(missing)}. "
+            "They have no default and must be injected at runtime: in Kubernetes "
+            "by the manifests repo (ExternalSecret / ConfigMap), locally by the "
+            "`environment:` block of docker-compose.yml."
+        )
+
+
+_check_required_env()
+
 
 class Settings:
     """Central settings object; all values read from environment at import time."""
 
-    DATABASE_URL: str = os.getenv(
-        "DATABASE_URL",
-        "postgresql://user:password@localhost:5432/flights",
-    )
-    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    DATABASE_URL: str = os.environ["DATABASE_URL"]
+    REDIS_URL: str = os.environ["REDIS_URL"]
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     APP_NAME: str = os.getenv("APP_NAME", "flights-api")

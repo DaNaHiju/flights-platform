@@ -1,15 +1,25 @@
 """Shared pytest fixtures: in-memory SQLite DB and a fake Redis client."""
 
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from shared import cache
-from app.database import Base, get_db
-from app.main import app
-
+# shared.config refuses to import without these, so they must be set BEFORE the
+# project imports below (a fixture is too late: monkeypatch only exists per test).
+# Assigned, not setdefault, so a developer's real DATABASE_URL can never leak into
+# a test run. Nothing here is a credential: a local SQLite file, and a Redis host
+# on the reserved .invalid TLD (RFC 2606) that can never resolve. The fake_redis
+# fixture replaces the client anyway.
 SQLALCHEMY_TEST_URL = "sqlite:///./test.db"
+os.environ["DATABASE_URL"] = SQLALCHEMY_TEST_URL
+os.environ["REDIS_URL"] = "redis://redis.invalid:6379/0"
+
+from shared import cache  # noqa: E402
+from app.database import Base, get_db  # noqa: E402
+from app.main import app  # noqa: E402
 
 engine = create_engine(SQLALCHEMY_TEST_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
