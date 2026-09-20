@@ -1,6 +1,23 @@
 API Contract — flights-platform
 Status: draft. Written before implementation. Any change to this document must be reflected in the Helm chart (ConfigMap, Secret, Service, probes) and vice versa.
 
+## Scope: bookings are simulated
+
+fli reads data from Google Flights; it does not sell tickets. This
+service has no payment processor and no airline inventory integration,
+so POST /bookings does not purchase anything: it validates the payload,
+stores the offer snapshot and returns an id.
+
+A real booking would span three systems with independent state — this
+service, an inventory provider (Amadeus, Sabre, Duffel) and a payment
+processor — with no transaction spanning all three. It would need a
+hold-charge-confirm sequence with compensating actions (a saga) and a
+status field on the booking. That is deliberately out of scope.
+
+The offer_snapshot column is not affected by this: storing the exact
+offer as shown at booking time is what a real system does too, because
+the upstream price changes between display and confirmation.
+
 
 Provider decision. This contract originally assumed the Amadeus Self-Service API. Amadeus Self-Service closed on July 17, 2026. The data provider is now `fli` (PyPI package `flights`, github.com/punitarani/fli), a Python library that retrieves live data from Google Flights by reverse-engineering its internal endpoints. It requires no API key and no OAuth2 flow. Alternatives evaluated and discarded:
 Amadeus Self-Service — discarded, portal closed July 17, 2026
