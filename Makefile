@@ -26,8 +26,9 @@ lint:
 test:
 	cd $(APP_DIR) && pytest tests/ --cov=app --cov=shared --cov-report=term-missing -v
 
+# Context is the repo root so the Dockerfile can COPY shared/
 build:
-	docker build -t $(IMAGE_NAME):$(IMAGE_TAG) $(APP_DIR)
+	docker build -f $(APP_DIR)/Dockerfile -t $(IMAGE_NAME):$(IMAGE_TAG) .
 
 run:
 	$(COMPOSE) up --build

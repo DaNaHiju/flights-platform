@@ -1,17 +1,31 @@
-__pycache__/
-*.pyc
-*.pyo
+# The build context is the repo root. Docker anchors patterns to the context
+# root (unlike .gitignore), so anything that can live in a subdirectory
+# (services/api/tests, services/api/venv, ...) needs a **/ prefix.
+
+# VCS
 .git/
 .gitignore
-.pytest_cache/
-.coverage
-htmlcov/
-venv/
-.venv/
-.env
-.env.local
-tests/
-*.md
-.DS_Store
+
+# Python artifacts
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/.pytest_cache/
+**/.coverage
+**/htmlcov/
+
+# Virtualenvs and local databases
+**/venv/
+**/.venv/
+**/*.db
+
+# Local env files
+**/.env
+**/.env.local
+
+# Not needed in the image
+**/tests/
+**/*.md
+**/.DS_Store
 docker-compose.yml
 Makefile

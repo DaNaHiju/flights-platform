@@ -27,7 +27,7 @@ flights-platform/
 │       │   ├── db_models.py   SQLAlchemy ORM + booking schemas
 │       │   └── database.py    PostgreSQL connection (SQLAlchemy)
 │       ├── tests/             pytest test suite (sqlite in-memory, fli/Redis mocked)
-│       ├── Dockerfile         Multi-stage build (builder + slim runtime)
+│       ├── Dockerfile         Multi-stage build; context is the repo root
 │       └── requirements.txt
 ├── docs/
 │   └── api-contract.md        Endpoints, schemas, env vars, caching strategy
@@ -94,7 +94,8 @@ make lint
 ## Building the Docker image
 
 ```bash
-docker build -t flights-api:v1 services/api
+# Run from the repo root: the build context must include shared/
+docker build -f services/api/Dockerfile -t flights-api:v1 .
 
 # Verify health check
 docker run -e DATABASE_URL=sqlite:/// -p 8000:8000 flights-api:v1
@@ -135,7 +136,7 @@ Full request/response schemas: [docs/api-contract.md](docs/api-contract.md).
 make install       # pip install -r services/api/requirements.txt
 make lint          # black + pylint
 make test          # pytest with coverage
-make build         # docker build (services/api)
+make build         # docker build (context = repo root)
 make run           # docker-compose up
 ```
 
