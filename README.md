@@ -13,7 +13,7 @@ API de búsqueda y reserva de vuelos (FastAPI), repo de código de aplicación.
 ```
 flights-platform/
 ├── services/
-│   └── flights-api/           FastAPI flights booking service
+│   └── api/                   FastAPI flights booking service
 │       ├── app/
 │       │   ├── api/           Route handlers: flights, deals, bookings
 │       │   ├── jobs/          refresh_deals.py — invoked on a schedule by Repo 2's CronJob
@@ -53,7 +53,7 @@ cd flights-platform
 docker-compose up --build
 
 # In a second terminal: run tests
-cd services/flights-api
+cd services/api
 pip install -r requirements.txt
 pytest tests/ -v
 ```
@@ -66,7 +66,7 @@ Docs at http://localhost:8000/docs
 ## Running tests
 
 ```bash
-cd services/flights-api
+cd services/api
 pip install -r requirements.txt
 pytest tests/ -v --cov=app --cov-report=term-missing
 ```
@@ -78,8 +78,8 @@ fli itself is never called in tests — `search_one_way` and the Redis client ar
 ## Linting
 
 ```bash
-black --check services/flights-api/app/
-pylint services/flights-api/app/ --fail-under=7.0
+black --check services/api/app/
+pylint services/api/app/ --fail-under=7.0
 
 # Or via make:
 make lint
@@ -90,7 +90,7 @@ make lint
 ## Building the Docker image
 
 ```bash
-docker build -t flights-api:v1 services/flights-api
+docker build -t flights-api:v1 services/api
 
 # Verify health check
 docker run -e DATABASE_URL=sqlite:/// -p 8000:8000 flights-api:v1
@@ -128,10 +128,10 @@ Full request/response schemas: [docs/api-contract.md](docs/api-contract.md).
 ## Makefile targets
 
 ```bash
-make install       # pip install -r services/flights-api/requirements.txt
+make install       # pip install -r services/api/requirements.txt
 make lint          # black + pylint
 make test          # pytest with coverage
-make build         # docker build (services/flights-api)
+make build         # docker build (services/api)
 make run           # docker-compose up
 ```
 

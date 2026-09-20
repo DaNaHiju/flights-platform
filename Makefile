@@ -5,7 +5,7 @@ PIP         := pip3
 IMAGE_NAME  := flights-api
 IMAGE_TAG   := latest
 COMPOSE     := docker-compose
-APP_DIR     := services/flights-api
+APP_DIR     := services/api
 
 help:
 	@echo "Available targets:"
