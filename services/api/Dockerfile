@@ -31,14 +31,14 @@ COPY --from=builder /install /usr/local
 COPY shared/ ./shared/
 COPY services/api/app/ ./app/
 
-# /app on PYTHONPATH makes both `app` and `shared` importable
+# /app on PYTHONPATH makes both `app` and `shared` importable.
+# DATABASE_URL and REDIS_URL are deliberately NOT set here: they are injected at
+# runtime (ExternalSecret in Kubernetes, docker-compose.yml locally).
 ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     LOG_LEVEL=INFO \
-    ENVIRONMENT=production \
-    DATABASE_URL=postgresql://user:password@postgres:5432/flights \
-    REDIS_URL=redis://redis:6379/0
+    ENVIRONMENT=production
 
 USER 10001:10001
 
