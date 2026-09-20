@@ -13,7 +13,7 @@ flights-api
 Field
 Value
 Runtime
-Python 3.12 / FastAPI
+Python 3.11 / FastAPI
 Container port
 8000
 Liveness
@@ -50,21 +50,9 @@ flights-api
 Variable
 Source
 Example
-DB_HOST
-ConfigMap
-flights-postgres
-DB_PORT
-ConfigMap
-5432
-DB_NAME
-ConfigMap
-flights
-DB_USER
-Secret
-flights_app
-DB_PASSWORD
-Secret
-—
+DATABASE_URL
+Secret (composed by the ExternalSecret, see below)
+postgresql://<credentials>@flights-postgres:5432/flights
 REDIS_URL
 ConfigMap
 redis://flights-redis:6379/0
@@ -86,11 +74,20 @@ ConfigMap
 DEALS_CACHE_TTL
 ConfigMap
 7200
+OFFER_CACHE_TTL
+ConfigMap
+600
 
 
-The database URL is split rather than stored as a single connection string, so that only the credentials live in the Secret and the rest stays readable in the ConfigMap. The application composes the DSN at startup.
+DATABASE_URL composition. The application consumes a single DATABASE_URL, exactly as given (shared/config.py). It does not read separate DB_HOST / DB_PORT / DB_NAME / DB_USER / DB_PASSWORD variables and it does not build the DSN itself. The composition happens in the ExternalSecret (flights-platform-manifests repo), not in the app: its spec.target.template builds DATABASE_URL from the individual credential keys stored in AWS Secrets Manager. The names of those keys are not literals: they are the Helm values externalSecrets.remoteKeys.dbUser and externalSecrets.remoteKeys.dbPassword. Locally, docker-compose.yml sets DATABASE_URL directly. Because the URL embeds the credentials, the whole string lives in the Secret; host, port and database name are not separately readable from a ConfigMap.
 
-fli requires no credentials, so there is no Secret for the data provider. DB_USER and DB_PASSWORD are the only Secrets left in this table.
+The Kubernetes Secret the pod receives has three keys: DATABASE_URL (composed by the ExternalSecret template), and DB_USER and DB_PASSWORD as separate keys. flights-api reads only DATABASE_URL; DB_USER and DB_PASSWORD are consumed by the Bitnami postgresql subchart through auth.existingSecret.
+
+Password constraint. DATABASE_URL is a URI, so the PostgreSQL password must not contain URL-reserved characters: @ : / # ? [ ]. Terraform must generate the password with override_special excluding them. The password is not percent-encoded when DATABASE_URL is composed, because encoding a password that is already correct would double-encode it. This is marked TODO(terraform) in the chart.
+
+DATABASE_URL and REDIS_URL are required and have no default in the code. If either is missing, the app fails at import with an error naming the missing variable(s), instead of falling back to localhost and failing later on a connection error.
+
+fli requires no credentials, so there is no Secret for the data provider. All three Secret keys above are PostgreSQL credentials.
 flights-web
 Variable
 Source
