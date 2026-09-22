@@ -17,22 +17,27 @@ flights-platform/
 │   ├── providers.py           fli (Google Flights) search wrapper
 │   ├── cache.py               Redis client + JSON cache helpers
 │   ├── schemas.py             Pydantic flight schemas (FlightOffer, Leg, Deal)
-│   └── config.py              Settings from environment variables
+│   └── config.py              Shared settings (REDIS_URL, ...) + require_env() check
 ├── services/
-│   └── api/                   FastAPI flights booking service
-│       ├── app/
-│       │   ├── api/           Route handlers: flights, deals, bookings
-│       │   ├── jobs/          refresh_deals.py — invoked on a schedule by Repo 2's CronJob
-│       │   ├── utils/         HTTP + bookings Prometheus metrics
-│       │   ├── db_models.py   SQLAlchemy ORM + booking schemas
-│       │   └── database.py    PostgreSQL connection (SQLAlchemy)
-│       ├── tests/             pytest test suite (sqlite in-memory, fli/Redis mocked)
-│       ├── Dockerfile         Multi-stage build; context is the repo root
-│       └── requirements.txt
+│   ├── api/                   FastAPI flights booking service
+│   │   ├── app/
+│   │   │   ├── api/           Route handlers: flights, deals, bookings
+│   │   │   ├── config.py      API settings (DATABASE_URL, ...) on top of shared
+│   │   │   ├── utils/         HTTP + bookings Prometheus metrics
+│   │   │   ├── db_models.py   SQLAlchemy ORM + booking schemas
+│   │   │   └── database.py    PostgreSQL connection (SQLAlchemy)
+│   │   ├── tests/             pytest test suite (sqlite in-memory, fli/Redis mocked)
+│   │   ├── Dockerfile         Multi-stage build; context is the repo root
+│   │   └── requirements.txt
+│   └── worker/                Deals refresh job — run on a schedule by Repo 2's CronJob
+│       ├── worker/            refresh_deals.py + worker settings (no DATABASE_URL)
+│       ├── tests/             pytest test suite (fli/Redis mocked)
+│       ├── Dockerfile         Multi-stage build; context is the repo root; no HEALTHCHECK
+│       └── requirements.txt   Subset of the api's pins: no fastapi/sqlalchemy/psycopg2
 ├── docs/
 │   └── api-contract.md        Endpoints, schemas, env vars, caching strategy
 ├── pytest.ini                 Puts the repo root on the path so `shared` resolves
-├── docker-compose.yml         Local dev: api + PostgreSQL + Redis
+├── docker-compose.yml         Local dev: api + worker + PostgreSQL + Redis
 └── Makefile                   Dev shortcuts
 ```
 
@@ -42,7 +47,7 @@ flights-platform/
 
 | Tool | Version |
 |------|---------|
-| Python | 3.11+ |
+| Python | 3.12 |
 | Docker | 24+ |
 
 ---

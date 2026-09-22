@@ -9,7 +9,7 @@ Portfolio project doubling as a DevOps home assignment (EKS / ArgoCD / Istio / H
 Every line must be explainable out loud in a review call. Prefer clarity over cleverness.
 
 ## Stack
-- Python 3.11, FastAPI
+- Python 3.12, FastAPI
 - `fli` library (reverse-engineers Google Flights) — no official API key
 - Docker multi-stage build, non-root runtime user
 - Optional deps: PostgreSQL, Redis (conditional Helm subcharts, not always enabled)
