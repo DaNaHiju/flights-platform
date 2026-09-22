@@ -5,7 +5,7 @@ import uuid
 
 from pythonjsonlogger import jsonlogger
 
-from app.config import settings
+from shared.config import settings
 
 
 class RequestIdFilter(logging.Filter):

@@ -7,10 +7,10 @@ the CronJob object itself.
 
 from datetime import datetime, timedelta, timezone
 
-from app.cache import set_json
-from app.config import settings
-from app.providers import ProviderUnavailableError, search_one_way
-from app.utils.logging import log
+from shared.cache import set_json
+from shared.config import settings
+from shared.providers import ProviderUnavailableError, search_one_way
+from shared.utils.logging import log
 
 DEALS_CACHE_KEY = "deals:top"
 

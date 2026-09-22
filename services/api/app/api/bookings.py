@@ -6,11 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.cache import get_json
 from app.database import get_db
-from app.models import BookingCreate, BookingORM, BookingResponse, flight_offer_from_raw
-from app.utils.logging import log
+from app.db_models import BookingCreate, BookingORM, BookingResponse
 from app.utils.metrics import bookings_created
+from shared.cache import get_json
+from shared.schemas import flight_offer_from_raw
+from shared.utils.logging import log
 
 router = APIRouter()
 

@@ -11,7 +11,7 @@ from fli.search import SearchFlights
 from fli.search.exceptions import SearchClientError
 from fli.search.flights import SearchParseError
 
-from app.utils.logging import log
+from shared.utils.logging import log
 
 
 class ProviderUnavailableError(Exception):

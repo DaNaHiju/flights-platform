@@ -2,7 +2,7 @@
 
 from fastapi.testclient import TestClient
 
-from app.providers import ProviderUnavailableError
+from shared.providers import ProviderUnavailableError
 
 RAW_OFFER = {
     "legs": [

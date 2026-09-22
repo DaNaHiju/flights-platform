@@ -8,7 +8,7 @@ the manifests repo.
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from app.cache import get_json
+from shared.cache import get_json
 
 router = APIRouter()
 

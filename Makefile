@@ -5,7 +5,7 @@ PIP         := pip3
 IMAGE_NAME  := flights-api
 IMAGE_TAG   := latest
 COMPOSE     := docker-compose
-APP_DIR     := services/flights-api
+APP_DIR     := services/api
 
 help:
 	@echo "Available targets:"
@@ -20,14 +20,15 @@ install:
 	$(PIP) install -r $(APP_DIR)/requirements.txt
 
 lint:
-	black --check --diff $(APP_DIR)/app/
-	pylint $(APP_DIR)/app/ --fail-under=7.0
+	black --check --diff $(APP_DIR)/app/ shared/
+	pylint $(APP_DIR)/app/ shared/ --fail-under=7.0
 
 test:
-	cd $(APP_DIR) && pytest tests/ --cov=app --cov-report=term-missing -v
+	cd $(APP_DIR) && pytest tests/ --cov=app --cov=shared --cov-report=term-missing -v
 
+# Context is the repo root so the Dockerfile can COPY shared/
 build:
-	docker build -t $(IMAGE_NAME):$(IMAGE_TAG) $(APP_DIR)
+	docker build -f $(APP_DIR)/Dockerfile -t $(IMAGE_NAME):$(IMAGE_TAG) .
 
 run:
 	$(COMPOSE) up --build

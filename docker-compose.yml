@@ -29,8 +29,8 @@ services:
 
   api:
     build:
-      context: ./services/flights-api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/api/Dockerfile
     ports:
       - "8000:8000"
     environment:

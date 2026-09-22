@@ -9,12 +9,12 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app import cache
 from app.api import bookings, deals, flights
-from app.config import settings
 from app.database import create_tables, get_db
-from app.utils.logging import log
 from app.utils.metrics import request_count, request_duration
+from shared import cache
+from shared.config import settings
+from shared.utils.logging import log
 
 
 @asynccontextmanager

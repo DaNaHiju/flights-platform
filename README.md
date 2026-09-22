@@ -12,22 +12,26 @@ API de búsqueda y reserva de vuelos (FastAPI), repo de código de aplicación.
 
 ```
 flights-platform/
+├── shared/                    Code shared across services (imported as `shared.*`)
+│   ├── utils/                 JSON logging + provider_errors metric
+│   ├── providers.py           fli (Google Flights) search wrapper
+│   ├── cache.py               Redis client + JSON cache helpers
+│   ├── schemas.py             Pydantic flight schemas (FlightOffer, Leg, Deal)
+│   └── config.py              Settings from environment variables
 ├── services/
-│   └── flights-api/           FastAPI flights booking service
+│   └── api/                   FastAPI flights booking service
 │       ├── app/
 │       │   ├── api/           Route handlers: flights, deals, bookings
 │       │   ├── jobs/          refresh_deals.py — invoked on a schedule by Repo 2's CronJob
-│       │   ├── utils/         JSON logging + Prometheus metrics
-│       │   ├── providers.py   fli (Google Flights) search wrapper
-│       │   ├── cache.py       Redis client + JSON cache helpers
-│       │   ├── models.py      Pydantic schemas + SQLAlchemy ORM
-│       │   ├── database.py    PostgreSQL connection (SQLAlchemy)
-│       │   └── config.py      Settings from environment variables
+│       │   ├── utils/         HTTP + bookings Prometheus metrics
+│       │   ├── db_models.py   SQLAlchemy ORM + booking schemas
+│       │   └── database.py    PostgreSQL connection (SQLAlchemy)
 │       ├── tests/             pytest test suite (sqlite in-memory, fli/Redis mocked)
-│       ├── Dockerfile         Multi-stage build (builder + slim runtime)
+│       ├── Dockerfile         Multi-stage build; context is the repo root
 │       └── requirements.txt
 ├── docs/
 │   └── api-contract.md        Endpoints, schemas, env vars, caching strategy
+├── pytest.ini                 Puts the repo root on the path so `shared` resolves
 ├── docker-compose.yml         Local dev: api + PostgreSQL + Redis
 └── Makefile                   Dev shortcuts
 ```
@@ -53,7 +57,7 @@ cd flights-platform
 docker-compose up --build
 
 # In a second terminal: run tests
-cd services/flights-api
+cd services/api
 pip install -r requirements.txt
 pytest tests/ -v
 ```
@@ -66,7 +70,7 @@ Docs at http://localhost:8000/docs
 ## Running tests
 
 ```bash
-cd services/flights-api
+cd services/api
 pip install -r requirements.txt
 pytest tests/ -v --cov=app --cov-report=term-missing
 ```
@@ -78,8 +82,8 @@ fli itself is never called in tests — `search_one_way` and the Redis client ar
 ## Linting
 
 ```bash
-black --check services/flights-api/app/
-pylint services/flights-api/app/ --fail-under=7.0
+black --check services/api/app/ shared/
+pylint services/api/app/ shared/ --fail-under=7.0
 
 # Or via make:
 make lint
@@ -90,7 +94,8 @@ make lint
 ## Building the Docker image
 
 ```bash
-docker build -t flights-api:v1 services/flights-api
+# Run from the repo root: the build context must include shared/
+docker build -f services/api/Dockerfile -t flights-api:v1 .
 
 # Verify health check
 docker run -e DATABASE_URL=sqlite:/// -p 8000:8000 flights-api:v1
@@ -128,10 +133,10 @@ Full request/response schemas: [docs/api-contract.md](docs/api-contract.md).
 ## Makefile targets
 
 ```bash
-make install       # pip install -r services/flights-api/requirements.txt
+make install       # pip install -r services/api/requirements.txt
 make lint          # black + pylint
 make test          # pytest with coverage
-make build         # docker build (services/flights-api)
+make build         # docker build (context = repo root)
 make run           # docker-compose up
 ```
 

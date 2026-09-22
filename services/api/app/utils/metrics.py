@@ -1,4 +1,4 @@
-"""Prometheus metrics definitions for the flights API."""
+"""Prometheus metrics definitions specific to the flights API."""
 
 from prometheus_client import Counter, Histogram
 
@@ -18,9 +18,4 @@ request_duration = Histogram(
 bookings_created = Counter(
     "bookings_created_total",
     "Total number of bookings successfully created",
-)
-
-provider_errors = Counter(
-    "provider_errors_total",
-    "Total number of failed calls to fli (Google Flights)",
 )
