@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-# shared.config refuses to import without these, so they must be set BEFORE the
+# app.config refuses to import without these, so they must be set BEFORE the
 # project imports below (a fixture is too late: monkeypatch only exists per test).
 # Assigned, not setdefault, so a developer's real DATABASE_URL can never leak into
 # a test run. Nothing here is a credential: a local SQLite file, and a Redis host

@@ -7,8 +7,8 @@ the CronJob object itself.
 
 from datetime import datetime, timedelta, timezone
 
+from app.config import settings
 from shared.cache import set_json
-from shared.config import settings
 from shared.providers import ProviderUnavailableError, search_one_way
 from shared.utils.logging import log
 
