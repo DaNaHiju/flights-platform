@@ -24,9 +24,5 @@ class Settings(SharedSettings):
     # Unverified — see docs/api-contract.md open questions.
     OFFER_CACHE_TTL: int = int(os.getenv("OFFER_CACHE_TTL", "600"))
 
-    # Used only by app/jobs/refresh_deals.py.
-    FLIGHTS_DEFAULT_ORIGIN: str = os.getenv("FLIGHTS_DEFAULT_ORIGIN", "TLV")
-    DEALS_CACHE_TTL: int = int(os.getenv("DEALS_CACHE_TTL", "7200"))
-
 
 settings = Settings()

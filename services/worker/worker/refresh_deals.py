@@ -1,16 +1,16 @@
 """Populates the deals:top Redis cache read by GET /deals.
 
-Meant to be run on a schedule (`python -m app.jobs.refresh_deals`) by a
+Meant to be run on a schedule (`python -m worker.refresh_deals`) by a
 CronJob defined in the manifests repo — this repo owns the job logic, not
 the CronJob object itself.
 """
 
 from datetime import datetime, timedelta, timezone
 
-from app.config import settings
 from shared.cache import set_json
 from shared.providers import ProviderUnavailableError, search_one_way
 from shared.utils.logging import log
+from worker.config import settings
 
 DEALS_CACHE_KEY = "deals:top"
 

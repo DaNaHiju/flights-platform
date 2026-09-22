@@ -1,9 +1,9 @@
 """Top deals API router.
 
 Always served from Redis. This router never calls fli directly — the
-deals:top cache is populated out-of-band by the refresh job (see
-app/jobs/refresh_deals.py), invoked on a schedule by a CronJob defined in
-the manifests repo.
+deals:top cache is populated out-of-band by the worker service (see
+services/worker/worker/refresh_deals.py), invoked on a schedule by a CronJob
+defined in the manifests repo.
 """
 
 from fastapi import APIRouter, HTTPException, Query, status
