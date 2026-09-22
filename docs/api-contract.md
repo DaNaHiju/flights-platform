@@ -30,7 +30,7 @@ flights-api
 Field
 Value
 Runtime
-Python 3.11 / FastAPI
+Python 3.12 / FastAPI
 Container port
 8000
 Liveness

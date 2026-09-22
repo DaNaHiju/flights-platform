@@ -2,7 +2,7 @@
 # Build context is the REPO ROOT (not services/worker/) so that shared/ is reachable:
 #   docker build -f services/worker/Dockerfile .
 # ── Stage 1: dependency builder ──────────────────────────────────────────────
-FROM python:3.11-slim AS builder
+FROM python:3.12-slim AS builder
 
 WORKDIR /build
 
@@ -14,7 +14,7 @@ RUN pip install --upgrade pip --quiet && \
     pip install --prefix=/install --no-cache-dir -r requirements.txt
 
 # ── Stage 2: minimal runtime image ───────────────────────────────────────────
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Non-root runtime user. Numeric UID/GID so the kubelet can verify runAsNonRoot
 # (it cannot resolve a user name to check that it is not root).
