@@ -47,5 +47,23 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # One-shot job: refreshes deals:top once and exits. In Kubernetes a CronJob
+  # (manifests repo) runs it on a schedule. No DATABASE_URL on purpose.
+  worker:
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      FLIGHTS_CURRENCY: USD
+      FLIGHTS_DEFAULT_ORIGIN: TLV
+      LOG_LEVEL: INFO
+      ENVIRONMENT: development
+    depends_on:
+      redis:
+        condition: service_healthy
+    # "no": a restart loop would hammer Google Flights through fli.
+    restart: "no"
+
 volumes:
   postgres_data:

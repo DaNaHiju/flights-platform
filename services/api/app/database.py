@@ -3,7 +3,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
-from shared.config import settings
+from app.config import settings
 
 engine = create_engine(
     settings.DATABASE_URL,

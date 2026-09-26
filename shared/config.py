@@ -1,16 +1,28 @@
-"""Application configuration loaded from environment variables."""
+"""Configuration shared by every service, loaded from environment variables.
+
+Only settings that BOTH the API and the worker need live here. Each service
+declares its own settings in its own config module (services/api/app/config.py,
+services/worker/worker/config.py).
+
+This module does NOT validate anything when imported. Each service calls
+`require_env` exactly once, with its complete list (SHARED_REQUIRED_ENV plus
+its own), so a single error names every missing variable — not one per deploy.
+"""
 
 import os
 
-# Connection strings have NO default on purpose: if one is missing the process
-# must stop at import time with a clear message, not fall back silently to
-# localhost and fail later with a confusing connection error.
-REQUIRED_ENV = ("DATABASE_URL", "REDIS_URL")
+# Required by code in shared/ itself (shared/cache.py connects to Redis).
+SHARED_REQUIRED_ENV = ("REDIS_URL",)
 
 
-def _check_required_env() -> None:
-    """Raise a clear error naming every required variable that is unset or empty."""
-    missing = [name for name in REQUIRED_ENV if not os.getenv(name)]
+def require_env(*names: str) -> None:
+    """Raise a clear error naming every variable in *names* that is unset or empty.
+
+    Connection strings have NO default on purpose: if one is missing the process
+    must stop at import time with a clear message, not fall back silently to
+    localhost and fail later with a confusing connection error.
+    """
+    missing = [name for name in names if not os.getenv(name)]
     if missing:
         raise RuntimeError(
             f"Missing required environment variable(s): {', '.join(missing)}. "
@@ -20,30 +32,21 @@ def _check_required_env() -> None:
         )
 
 
-_check_required_env()
+class SharedSettings:
+    """Settings every service needs; read from the environment at import time."""
 
-
-class Settings:
-    """Central settings object; all values read from environment at import time."""
-
-    DATABASE_URL: str = os.environ["DATABASE_URL"]
-    REDIS_URL: str = os.environ["REDIS_URL"]
+    # Read with getenv (None if unset) so importing this module never raises on
+    # its own. There is no fallback value: the service's require_env call has
+    # already stopped the process if it is missing.
+    REDIS_URL: str | None = os.getenv("REDIS_URL")
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     APP_NAME: str = os.getenv("APP_NAME", "flights-api")
-    APP_VERSION: str = os.getenv("APP_VERSION", "1.0.0")
-    HOST: str = os.getenv("HOST", "0.0.0.0")
-    PORT: int = int(os.getenv("PORT", "8000"))
 
-    # fli has no API key — these just steer what it asks Google Flights for.
+    # fli has no API key — this just steers what it asks Google Flights for.
+    # Shared so live search results and cached deals are always priced in the
+    # same currency.
     FLIGHTS_CURRENCY: str = os.getenv("FLIGHTS_CURRENCY", "USD")
-    FLIGHTS_DEFAULT_ORIGIN: str = os.getenv("FLIGHTS_DEFAULT_ORIGIN", "TLV")
-
-    SEARCH_CACHE_TTL: int = int(os.getenv("SEARCH_CACHE_TTL", "600"))
-    DEALS_CACHE_TTL: int = int(os.getenv("DEALS_CACHE_TTL", "7200"))
-    # Assumed validity window of a fli booking_token before Google expires it.
-    # Unverified — see docs/api-contract.md open questions.
-    OFFER_CACHE_TTL: int = int(os.getenv("OFFER_CACHE_TTL", "600"))
 
 
-settings = Settings()
+settings = SharedSettings()
