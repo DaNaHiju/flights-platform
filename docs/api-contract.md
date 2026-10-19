@@ -90,7 +90,7 @@ ConfigMap
 600
 DEALS_CACHE_TTL
 ConfigMap
-7200
+25200
 OFFER_CACHE_TTL
 ConfigMap
 600
