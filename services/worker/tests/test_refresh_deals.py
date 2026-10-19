@@ -1,5 +1,6 @@
 """Tests for the deals refresh job. fli is always mocked — no network calls."""
 
+import importlib
 import json
 import os
 
@@ -66,3 +67,33 @@ def test_no_offers_still_writes_empty_deal_list(fake_search, fake_redis):
 def test_worker_runs_without_database_url():
     assert "DATABASE_URL" not in os.environ
     assert not hasattr(settings, "DATABASE_URL")
+
+
+def test_cache_ttl_used_comes_from_settings(fake_search, fake_redis, monkeypatch):
+    monkeypatch.setattr(settings, "DEALS_CACHE_TTL", 1234)
+
+    job.refresh_deals()
+
+    assert fake_redis.ttls[job.DEALS_CACHE_KEY] == 1234
+
+
+def test_default_cache_ttl_outlasts_the_six_hour_cronjob(monkeypatch):
+    from worker import config
+
+    monkeypatch.delenv("DEALS_CACHE_TTL", raising=False)
+    try:
+        assert importlib.reload(config).settings.DEALS_CACHE_TTL > 6 * 3600
+    finally:
+        monkeypatch.undo()
+        importlib.reload(config)
+
+
+def test_cache_ttl_is_read_from_env(monkeypatch):
+    from worker import config
+
+    monkeypatch.setenv("DEALS_CACHE_TTL", "999")
+    try:
+        assert importlib.reload(config).settings.DEALS_CACHE_TTL == 999
+    finally:
+        monkeypatch.undo()
+        importlib.reload(config)
