@@ -57,6 +57,12 @@ def search_one_way(
         log.warning("Unexpected error calling fli: %s", exc)
         raise ProviderUnavailableError(str(exc)) from exc
 
+    # fli returns None (no exception) when Google's reply has no flights payload,
+    # e.g. a consent page or a soft block. That is a provider failure, not "no
+    # flights": an empty list below is a genuine empty result.
+    if results is None:
+        raise ProviderUnavailableError("fli returned no payload (None)")
+
     if not results:
         return []
 
