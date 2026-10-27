@@ -23,7 +23,10 @@ SEARCH_HORIZON_DAYS = 30
 
 
 def refresh_deals() -> int:
-    """Search each popular destination and cache the cheapest offers. Returns the deal count."""
+    """Search each popular destination and cache the cheapest offers. Returns the deal count.
+
+    Does not touch the cache when there are no deals.
+    """
     origin = settings.FLIGHTS_DEFAULT_ORIGIN
     travel_date = (
         datetime.now(timezone.utc) + timedelta(days=SEARCH_HORIZON_DAYS)
@@ -57,6 +60,15 @@ def refresh_deals() -> int:
                 "airline": primary_airline,
             }
         )
+
+    # 0 deals means every search failed or came back empty, almost always a
+    # provider outage. Overwriting would replace the last good list with an
+    # empty one, so keep it and let its TTL decide when it expires.
+    if not deals:
+        log.warning(
+            "Refreshed 0 deals from %s; keeping previous %s", origin, DEALS_CACHE_KEY
+        )
+        return 0
 
     deals.sort(key=lambda d: d["price"])
 
