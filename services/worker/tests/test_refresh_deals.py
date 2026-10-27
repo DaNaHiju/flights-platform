@@ -56,12 +56,29 @@ def test_provider_error_skips_only_that_destination(fake_search, fake_redis):
     assert [d["destination"] for d in _cached(fake_redis)["deals"]] == ["LHR"]
 
 
-def test_no_offers_still_writes_empty_deal_list(fake_search, fake_redis):
+def test_zero_deals_keeps_previous_cache(fake_search, fake_redis):
+    previous = json.dumps(
+        {"refreshed_at": "earlier", "deals": [{"destination": "MAD"}]}
+    )
+    fake_redis.store[job.DEALS_CACHE_KEY] = previous
+    fake_redis.ttls[job.DEALS_CACHE_KEY] = 111
+
     assert job.refresh_deals() == 0
 
-    cached = _cached(fake_redis)
-    assert cached["deals"] == []
-    assert "refreshed_at" in cached
+    assert fake_redis.store[job.DEALS_CACHE_KEY] == previous
+    assert fake_redis.ttls[job.DEALS_CACHE_KEY] == 111
+
+
+def test_zero_deals_logs_warning(fake_search, caplog):
+    fake_search["MAD"] = ProviderUnavailableError("fli returned no payload (None)")
+
+    with caplog.at_level("WARNING", logger=job.log.name):
+        assert job.refresh_deals() == 0
+
+    assert any(
+        r.levelname == "WARNING" and "keeping previous" in r.getMessage()
+        for r in caplog.records
+    )
 
 
 def test_worker_runs_without_database_url():
@@ -71,6 +88,7 @@ def test_worker_runs_without_database_url():
 
 def test_cache_ttl_used_comes_from_settings(fake_search, fake_redis, monkeypatch):
     monkeypatch.setattr(settings, "DEALS_CACHE_TTL", 1234)
+    fake_search["MAD"] = [_offer(100)]
 
     job.refresh_deals()
 
