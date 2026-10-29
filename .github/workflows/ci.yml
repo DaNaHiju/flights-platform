@@ -68,7 +68,9 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: services/${{ matrix.service }}/requirements.txt
+          cache-dependency-path: |
+            services/${{ matrix.service }}/requirements.txt
+            services/${{ matrix.service }}/requirements-dev.txt
 
       - name: Install dependencies
         run: pip install -r services/${{ matrix.service }}/requirements-dev.txt ruff==0.17.2
@@ -143,7 +145,7 @@ jobs:
         id: app
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ vars.MANIFESTS_APP_ID }}
+          client-id: ${{ vars.MANIFESTS_APP_CLIENT_ID }}
           private-key: ${{ secrets.MANIFESTS_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: flights-platform-manifests
@@ -213,3 +215,20 @@ jobs:
           done
           echo "::error::could not push to flights-platform-manifests after 3 attempts"
           exit 1
+
+  # ── Single required check for the branch ruleset ───────────────────────────
+  # build is a matrix that is skipped when nothing changed, so it cannot be
+  # marked required itself. This job always runs and summarises it.
+  ci-ok:
+    needs: [changes, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if a required job failed or was cancelled
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "needs results: $RESULTS"
+          case " $RESULTS " in
+            *" failure "*|*" cancelled "*) exit 1 ;;
+          esac
