@@ -21,7 +21,7 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      # JSON list of services to build, e.g. ["api","worker"] or [].
+      # JSON list of services to build, e.g. ["api","worker","web"] or [].
       services: ${{ steps.list.outputs.services }}
     steps:
       - uses: actions/checkout@v7
@@ -37,15 +37,20 @@ jobs:
               - 'services/worker/**'
               - 'shared/**'
               - '.github/workflows/ci.yml'
+            web:
+              - 'services/web/**'
+              - '.github/workflows/ci.yml'
       - name: List services to build
         id: list
         env:
           API: ${{ steps.filter.outputs.api }}
           WORKER: ${{ steps.filter.outputs.worker }}
+          WEB: ${{ steps.filter.outputs.web }}
         run: |
-          services=$(jq -nc --arg api "$API" --arg worker "$WORKER" \
+          services=$(jq -nc --arg api "$API" --arg worker "$WORKER" --arg web "$WEB" \
             '[ (if $api == "true" then "api" else empty end),
-               (if $worker == "true" then "worker" else empty end) ]')
+               (if $worker == "true" then "worker" else empty end),
+               (if $web == "true" then "web" else empty end) ]')
           echo "services=$services" >> "$GITHUB_OUTPUT"
 
   # ── One matrix leg per changed service ─────────────────────────────────────
@@ -64,7 +69,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # api and worker: Python lint + tests. web has its own steps below.
       - uses: actions/setup-python@v7
+        if: matrix.service != 'web'
         with:
           python-version: "3.12"
           cache: pip
@@ -73,15 +80,41 @@ jobs:
             services/${{ matrix.service }}/requirements-dev.txt
 
       - name: Install dependencies
+        if: matrix.service != 'web'
         run: pip install -r services/${{ matrix.service }}/requirements-dev.txt ruff==0.17.2
 
       - name: Lint
+        if: matrix.service != 'web'
         run: ruff check services/${{ matrix.service }} shared
 
       # One pytest run per service: both have a top-level `tests` package,
       # so their conftest files clash in the same session.
       - name: Test
+        if: matrix.service != 'web'
         run: pytest -q services/${{ matrix.service }}
+
+      # web: Node lint + tests (the image build itself runs `npm run build`).
+      - uses: actions/setup-node@v7
+        if: matrix.service == 'web'
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: services/web/package-lock.json
+
+      - name: Install dependencies (web)
+        if: matrix.service == 'web'
+        working-directory: services/web
+        run: npm ci
+
+      - name: Lint (web)
+        if: matrix.service == 'web'
+        working-directory: services/web
+        run: npm run lint
+
+      - name: Test (web)
+        if: matrix.service == 'web'
+        working-directory: services/web
+        run: npm test
 
       - name: Compute image tag
         id: tag
@@ -168,7 +201,7 @@ jobs:
           git config user.email "${bot_id}+${SLUG}[bot]@users.noreply.github.com"
 
       # Only the services built in this run are touched. The tag key is separate
-      # per service: api in the staging values file, worker in the chart values.
+      # per service: api in the staging values file, worker and web in the chart values.
       - name: Bump image tags
         env:
           SERVICES: ${{ needs.changes.outputs.services }}
@@ -180,6 +213,7 @@ jobs:
             case "$svc" in
               api)    file=charts/flights-api/values-staging.yaml ;;
               worker) file=charts/flights-worker/values.yaml ;;
+              web)    file=charts/flights-web/values.yaml ;;
               *)      echo "::error::unknown service $svc"; exit 1 ;;
             esac
             # sed edits only the `tag:` line inside the top-level `image:` block.
