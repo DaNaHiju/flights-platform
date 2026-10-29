@@ -177,6 +177,21 @@ query: origin (IATA, 3 chars, required)
 400 → { "error": "invalid_iata_code" | "invalid_date_format" | "date_in_past" }
 
 502 → { "error": "provider_unavailable" }
+
+Round trip: add the optional query parameter return_date (YYYY-MM-DD, not before date).
+Without it nothing above changes. With it:
+
+200 → { "results": [RoundTripOffer], "cached": bool, "cached_at": timestamp|null }
+
+RoundTripOffer: { "price": float,   # the whole pair
+                  "currency": string,
+                  "outbound": FlightOffer,
+                  "return": FlightOffer }   # cheapest pairs first, at most 10
+
+400 also → { "error": "return_before_departure" }   # invalid_date_format applies to return_date too
+
+At most 3 outbound flights are expanded with their returns (1 + 3 requests to Google). Round trip offers are not
+registered for POST /bookings (no offer_id to book).
 GET /deals
 Top deals, always served from Redis. This endpoint never calls fli directly — the cache is populated out-of-band by the CronJob.
 

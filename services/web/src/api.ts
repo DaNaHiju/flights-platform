@@ -1,4 +1,4 @@
-import type { Deal, FlightOffer } from "./types";
+import type { Deal, FlightOffer, RoundTripOffer } from "./types";
 
 // Same origin: nginx (or the vite dev server) forwards /api/* to flights-api.
 const BASE = "/api";
@@ -10,6 +10,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   invalid_iata_code: "Código de aeropuerto inválido. Usá 3 letras, por ejemplo EZE.",
   invalid_date_format: "La fecha no tiene un formato válido.",
   date_in_past: "La fecha tiene que ser hoy o posterior.",
+  return_before_departure: "La vuelta no puede ser antes de la ida.",
   deals_not_available: "Todavía no hay ofertas calculadas.",
 };
 
@@ -44,6 +45,22 @@ export async function searchFlights(
 ): Promise<FlightOffer[]> {
   const query = new URLSearchParams({ origin, destination, date });
   const data = await get<{ results: FlightOffer[] }>(`/flights?${query}`);
+  return data.results;
+}
+
+export async function searchRoundTrip(
+  origin: string,
+  destination: string,
+  date: string,
+  returnDate: string,
+): Promise<RoundTripOffer[]> {
+  const query = new URLSearchParams({
+    origin,
+    destination,
+    date,
+    return_date: returnDate,
+  });
+  const data = await get<{ results: RoundTripOffer[] }>(`/flights?${query}`);
   return data.results;
 }
 

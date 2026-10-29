@@ -56,3 +56,17 @@ section {
   padding: 0.6rem 0.8rem;
   border-radius: 4px;
 }
+
+.search select {
+  padding: 0.4rem;
+}
+
+.links {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.links a {
+  margin-right: 0.8rem;
+}

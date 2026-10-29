@@ -117,3 +117,85 @@ def test_search_flights_provider_unavailable(client: TestClient, monkeypatch):
     )
     assert response.status_code == 502
     assert response.json() == {"error": "provider_unavailable"}
+
+
+def test_round_trip_has_its_own_cache_key(client: TestClient, monkeypatch):
+    monkeypatch.setattr("app.api.flights.is_valid_iata", _valid_iata)
+    calls = {"one_way": 0, "round_trip": 0}
+
+    def fake_one_way(*args, **kwargs):
+        calls["one_way"] += 1
+        return [RAW_OFFER]
+
+    def fake_round_trip(*args, **kwargs):
+        calls["round_trip"] += 1
+        return [
+            {
+                "price": 2000.0,
+                "currency": "USD",
+                "outbound": RAW_OFFER,
+                "return": RAW_OFFER,
+            }
+        ]
+
+    monkeypatch.setattr("app.api.flights.search_one_way", fake_one_way)
+    monkeypatch.setattr("app.api.flights.search_round_trip", fake_round_trip)
+
+    one_way = {"origin": "TLV", "destination": "MAD", "date": "2099-01-01"}
+    round_trip = {**one_way, "return_date": "2099-01-08"}
+    other_return = {**one_way, "return_date": "2099-01-09"}
+
+    client.get("/flights/", params=one_way)
+    rt_first = client.get("/flights/", params=round_trip)
+    rt_second = client.get("/flights/", params=round_trip)
+    client.get("/flights/", params=other_return)
+    one_way_again = client.get("/flights/", params=one_way)
+
+    # The round trip did not read the one-way entry, and vice versa.
+    assert calls == {"one_way": 1, "round_trip": 2}
+    assert rt_first.json()["cached"] is False
+    assert rt_second.json()["cached"] is True
+    assert rt_second.json()["results"][0]["price"] == 2000.0
+    # One-way keeps its old key and its old response shape.
+    assert one_way_again.json()["cached"] is True
+    assert one_way_again.json()["results"][0]["offer_id"] == "TOKEN123"
+
+
+def test_one_way_cache_key_is_unchanged():
+    from app.api.flights import _search_cache_key
+
+    assert _search_cache_key("TLV", "MAD", "2099-01-01", 1) == "search:TLV:MAD:2099-01-01:1"
+    assert (
+        _search_cache_key("TLV", "MAD", "2099-01-01", 1, "2099-01-08")
+        != _search_cache_key("TLV", "MAD", "2099-01-01", 1)
+    )
+
+
+def test_return_date_before_departure(client: TestClient, monkeypatch):
+    monkeypatch.setattr("app.api.flights.is_valid_iata", _valid_iata)
+    response = client.get(
+        "/flights/",
+        params={
+            "origin": "TLV",
+            "destination": "MAD",
+            "date": "2099-01-08",
+            "return_date": "2099-01-01",
+        },
+    )
+    assert response.status_code == 400
+    assert response.json() == {"error": "return_before_departure"}
+
+
+def test_return_date_invalid_format(client: TestClient, monkeypatch):
+    monkeypatch.setattr("app.api.flights.is_valid_iata", _valid_iata)
+    response = client.get(
+        "/flights/",
+        params={
+            "origin": "TLV",
+            "destination": "MAD",
+            "date": "2099-01-01",
+            "return_date": "nope",
+        },
+    )
+    assert response.status_code == 400
+    assert response.json() == {"error": "invalid_date_format"}

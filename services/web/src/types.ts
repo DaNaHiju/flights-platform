@@ -27,3 +27,26 @@ export interface Deal {
   currency: string;
   airline: string;
 }
+
+// GET /flights with return_date: one item per outbound + return pair, priced as a whole.
+export interface RoundTripOffer {
+  price: number;
+  currency: string;
+  outbound: FlightOffer;
+  return: FlightOffer;
+}
+
+export type TripMode = "one-way" | "round-trip" | "multi-city";
+
+export interface SearchQuery {
+  mode: TripMode;
+  origin: string;
+  destination: string;
+  date: string;
+  // round-trip only
+  returnDate: string;
+  // multi-city only: the second, independent leg
+  origin2: string;
+  destination2: string;
+  date2: string;
+}
