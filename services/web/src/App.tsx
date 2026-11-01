@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { ApiError, listDeals, searchFlights, searchRoundTrip } from "./api";
+import { DealItem } from "./DealItem";
 import { OneWayItem, RoundTripItem } from "./OfferItem";
 import { SearchForm } from "./SearchForm";
 import type { Deal, FlightOffer, RoundTripOffer, SearchQuery } from "./types";
 
 function errorText(err: unknown): string {
-  return err instanceof ApiError ? err.message : "Algo salió mal.";
+  return err instanceof ApiError ? err.message : "Something went wrong.";
 }
 
 // One leg of a multi-city trip. Each leg is searched on its own, so one can fail
@@ -53,7 +54,7 @@ function MultiCityTotal({ legs }: { legs: Leg[] }) {
       <strong>
         Total: {total} {picks[0]!.currency}
       </strong>{" "}
-      (opción más barata de cada tramo; precio de dos pasajes separados)
+      (cheapest option of each leg; price of two separate tickets)
     </p>
   );
 }
@@ -107,14 +108,14 @@ export default function App() {
       <h1>Flights</h1>
 
       <section>
-        <h2>Buscar vuelos</h2>
+        <h2>Search flights</h2>
         <SearchForm onSearch={handleSearch} disabled={searching} />
-        {searching && <p>Buscando…</p>}
+        {searching && <p>Searching…</p>}
         {searchError && <p role="alert">{searchError}</p>}
 
         {results?.kind === "one-way" &&
           (results.offers.length === 0 ? (
-            <p>No hay vuelos para esa búsqueda.</p>
+            <p>No flights found for this search.</p>
           ) : (
             <ul className="offers">
               {results.offers.map((offer) => (
@@ -131,7 +132,7 @@ export default function App() {
 
         {results?.kind === "round-trip" &&
           (results.offers.length === 0 ? (
-            <p>No hay vuelos para esa búsqueda.</p>
+            <p>No flights found for this search.</p>
           ) : (
             <ul className="offers">
               {results.offers.map((offer) => (
@@ -153,10 +154,10 @@ export default function App() {
             {results.legs.map((leg, i) => (
               <div key={i}>
                 <h3>
-                  Tramo {i + 1}: {leg.origin} → {leg.destination} · {leg.date}
+                  Leg {i + 1}: {leg.origin} → {leg.destination} · {leg.date}
                 </h3>
                 {leg.error && <p role="alert">{leg.error}</p>}
-                {leg.offers?.length === 0 && <p>No hay vuelos para este tramo.</p>}
+                {leg.offers?.length === 0 && <p>No flights found for this leg.</p>}
                 {leg.offers && leg.offers.length > 0 && (
                   <ul className="offers">
                     {leg.offers.map((offer) => (
@@ -177,16 +178,13 @@ export default function App() {
       </section>
 
       <section>
-        <h2>Ofertas</h2>
+        <h2>Deals</h2>
         {dealsError && <p>{dealsError}</p>}
-        {!deals && !dealsError && <p>Cargando…</p>}
+        {!deals && !dealsError && <p>Loading…</p>}
         {deals && (
           <ul className="offers">
             {deals.map((deal) => (
-              <li key={`${deal.destination}-${deal.departure_date}`}>
-                <strong>{deal.destination}</strong> · {deal.departure_date} ·{" "}
-                {deal.price} {deal.currency} · {deal.airline}
-              </li>
+              <DealItem key={`${deal.destination}-${deal.departure_date}`} deal={deal} />
             ))}
           </ul>
         )}

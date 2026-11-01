@@ -4,14 +4,14 @@ import type { Deal, FlightOffer, RoundTripOffer } from "./types";
 const BASE = "/api";
 
 export const PROVIDER_DOWN_MESSAGE =
-  "El proveedor de vuelos no responde ahora. Probá de nuevo en unos minutos.";
+  "The flight provider is not responding right now. Please try again in a few minutes.";
 
 const ERROR_MESSAGES: Record<string, string> = {
-  invalid_iata_code: "Código de aeropuerto inválido. Usá 3 letras, por ejemplo EZE.",
-  invalid_date_format: "La fecha no tiene un formato válido.",
-  date_in_past: "La fecha tiene que ser hoy o posterior.",
-  return_before_departure: "La vuelta no puede ser antes de la ida.",
-  deals_not_available: "Todavía no hay ofertas calculadas.",
+  invalid_iata_code: "Invalid airport code. Use 3 letters, for example EZE.",
+  invalid_date_format: "The date format is not valid.",
+  date_in_past: "The date must be today or later.",
+  return_before_departure: "The return cannot be before the departure.",
+  deals_not_available: "No deals have been calculated yet.",
 };
 
 export class ApiError extends Error {}
@@ -21,7 +21,7 @@ async function get<T>(path: string): Promise<T> {
   try {
     res = await fetch(`${BASE}${path}`);
   } catch {
-    throw new ApiError("No se pudo conectar con el servidor.");
+    throw new ApiError("Could not connect to the server.");
   }
 
   if (res.status === 502) {
@@ -32,7 +32,7 @@ async function get<T>(path: string): Promise<T> {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
     throw new ApiError(
       (body.error && ERROR_MESSAGES[body.error]) ||
-        `Error inesperado (HTTP ${res.status}).`,
+        `Unexpected error (HTTP ${res.status}).`,
     );
   }
   return (await res.json()) as T;

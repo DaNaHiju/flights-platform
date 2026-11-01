@@ -7,9 +7,9 @@ interface Props {
 }
 
 const MODES: { value: TripMode; label: string }[] = [
-  { value: "one-way", label: "Solo ida" },
-  { value: "round-trip", label: "Ida y vuelta" },
-  { value: "multi-city", label: "Multi-ciudad" },
+  { value: "one-way", label: "One way" },
+  { value: "round-trip", label: "Round trip" },
+  { value: "multi-city", label: "Multi-city" },
 ];
 
 export function SearchForm({ onSearch, disabled }: Props) {
@@ -39,7 +39,7 @@ export function SearchForm({ onSearch, disabled }: Props) {
   return (
     <form onSubmit={handleSubmit} className="search">
       <label>
-        Tipo de viaje
+        Trip type
         <select value={mode} onChange={(e) => setMode(e.target.value as TripMode)}>
           {MODES.map((m) => (
             <option key={m.value} value={m.value}>
@@ -49,7 +49,7 @@ export function SearchForm({ onSearch, disabled }: Props) {
         </select>
       </label>
       <label>
-        Origen
+        Origin
         <input
           value={origin}
           onChange={(e) => setOrigin(e.target.value)}
@@ -60,7 +60,7 @@ export function SearchForm({ onSearch, disabled }: Props) {
         />
       </label>
       <label>
-        Destino
+        Destination
         <input
           value={destination}
           onChange={(e) => setDestination(e.target.value)}
@@ -71,7 +71,7 @@ export function SearchForm({ onSearch, disabled }: Props) {
         />
       </label>
       <label>
-        Fecha
+        Date
         <input
           type="date"
           value={date}
@@ -81,7 +81,7 @@ export function SearchForm({ onSearch, disabled }: Props) {
       </label>
       {mode === "round-trip" && (
         <label>
-          Vuelta
+          Return
           <input
             type="date"
             value={returnDate}
@@ -94,7 +94,7 @@ export function SearchForm({ onSearch, disabled }: Props) {
       {mode === "multi-city" && (
         <>
           <label>
-            Origen 2
+            Origin 2
             <input
               value={origin2}
               onChange={(e) => setOrigin2(e.target.value)}
@@ -105,7 +105,7 @@ export function SearchForm({ onSearch, disabled }: Props) {
             />
           </label>
           <label>
-            Destino 2
+            Destination 2
             <input
               value={destination2}
               onChange={(e) => setDestination2(e.target.value)}
@@ -116,7 +116,7 @@ export function SearchForm({ onSearch, disabled }: Props) {
             />
           </label>
           <label>
-            Fecha 2
+            Date 2
             <input
               type="date"
               value={date2}
@@ -127,7 +127,7 @@ export function SearchForm({ onSearch, disabled }: Props) {
         </>
       )}
       <button type="submit" disabled={disabled}>
-        Buscar
+        Search
       </button>
     </form>
   );
