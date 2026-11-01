@@ -1,4 +1,6 @@
 redis==5.2.1
 pydantic==2.10.4
 flights==0.9.0
+# Offline airport -> city/country lookup (MIT). Needed by shared/airports.py.
+airportsdata==20261030
 python-json-logger==2.0.7

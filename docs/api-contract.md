@@ -160,6 +160,12 @@ string
 duration_minutes
 int
 
+Added fields (additive; nothing above was renamed or removed):
+
+- FlightOffer: `total_duration_minutes` (int, same value as `duration_minutes`; in a RoundTripOffer each of `outbound` and `return` carries its own).
+- Leg: `departure_airport_code`, `arrival_airport_code` (IATA), `departure_city`, `arrival_city`, `departure_country_code`, `arrival_country_code` (ISO 3166-1 alpha-2). City and country come from the `airportsdata` package and are `null` when the airport is not in it; a code is `null` only if fli's airport name is not recognised.
+- Deal: `origin`, `origin_airport_name`, `origin_city`, `origin_country_code`, `destination_airport_name`, `destination_city`, `destination_country_code`, `total_duration_minutes`. Deals already in Redis lack these until the next worker refresh, so clients must treat them as optional.
+
 fli additionally returns amenities, legroom, co2_emissions, aircraft, and layovers on the offer and on each leg. These are excluded from the public response — they're Google Flights' own presentation detail and add noise to the booking use case, which only needs price, schedule, and airline identity to search offers and record a booking.
 GET /flights
 Search live offers. Served from Redis when the same query was made recently.
@@ -177,6 +183,21 @@ query: origin (IATA, 3 chars, required)
 400 → { "error": "invalid_iata_code" | "invalid_date_format" | "date_in_past" }
 
 502 → { "error": "provider_unavailable" }
+
+Round trip: add the optional query parameter return_date (YYYY-MM-DD, not before date).
+Without it nothing above changes. With it:
+
+200 → { "results": [RoundTripOffer], "cached": bool, "cached_at": timestamp|null }
+
+RoundTripOffer: { "price": float,   # the whole pair
+                  "currency": string,
+                  "outbound": FlightOffer,
+                  "return": FlightOffer }   # cheapest pairs first, at most 10
+
+400 also → { "error": "return_before_departure" }   # invalid_date_format applies to return_date too
+
+At most 3 outbound flights are expanded with their returns (1 + 3 requests to Google). Round trip offers are not
+registered for POST /bookings (no offer_id to book).
 GET /deals
 Top deals, always served from Redis. This endpoint never calls fli directly — the cache is populated out-of-band by the CronJob.
 

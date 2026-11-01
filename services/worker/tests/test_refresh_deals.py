@@ -115,3 +115,31 @@ def test_cache_ttl_is_read_from_env(monkeypatch):
     finally:
         monkeypatch.undo()
         importlib.reload(config)
+
+
+def test_deals_carry_airport_and_duration_fields(fake_search, fake_redis):
+    fake_search["MAD"] = [dict(_offer(250), duration=315)]
+
+    job.refresh_deals()
+
+    deal = _cached(fake_redis)["deals"][0]
+    assert deal["origin"] == settings.FLIGHTS_DEFAULT_ORIGIN
+    assert (deal["destination_city"], deal["destination_country_code"]) == ("Madrid", "ES")
+    assert deal["destination_airport_name"]
+    assert deal["total_duration_minutes"] == 315
+    # Existing fields are still there.
+    assert {"destination", "departure_date", "price", "currency", "airline"} <= deal.keys()
+
+
+def test_deal_for_airport_missing_in_airportsdata_has_null_city(
+    fake_search, fake_redis, monkeypatch
+):
+    monkeypatch.setattr(job, "POPULAR_DESTINATIONS", ["PBI"])
+    fake_search["PBI"] = [_offer(99)]
+
+    job.refresh_deals()
+
+    deal = _cached(fake_redis)["deals"][0]
+    assert deal["destination_city"] is None
+    assert deal["destination_country_code"] is None
+    assert deal["total_duration_minutes"] is None

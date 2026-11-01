@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 from shared.cache import set_json
 from shared.providers import ProviderUnavailableError, search_one_way
+from shared.schemas import deal_airport_fields
 from shared.utils.logging import log
 from worker.config import settings
 
@@ -58,6 +59,8 @@ def refresh_deals() -> int:
                 "price": cheapest["price"],
                 "currency": cheapest["currency"],
                 "airline": primary_airline,
+                **deal_airport_fields(origin, destination),
+                "total_duration_minutes": cheapest.get("duration"),
             }
         )
 
