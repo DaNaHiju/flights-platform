@@ -1,8 +1,8 @@
 name: CI
 
 # PR: lint + test + build + scan (nothing is pushed).
-# main: the same, then push the image to GHCR (homelab) and to ECR (EKS), and bump
-# the tag in the manifests repo. Both registries get the same sha-<7> tag.
+# main: the same, then push the image to GHCR (homelab) and, when vars.ECR_PUSH == 'true', to ECR
+# (EKS), and bump the tag in the manifests repo. Both registries get the same sha-<7> tag.
 on:
   push:
     branches: [main]
@@ -160,11 +160,12 @@ jobs:
         if: github.event_name == 'push'
         run: docker push "$IMAGE:${{ steps.tag.outputs.tag }}"
 
-      # ECR. Static access key of the IAM user github-ecr-push (push to the three
+      # ECR (optional: only when the repository variable ECR_PUSH is 'true', i.e. while an
+      # EKS environment exists). Static access key of the IAM user github-ecr-push (push to the three
       # flights-* repositories only): GitHub OIDC would be keyless, but it needs an
       # IAM OIDC provider, which the account's SCP forbids. See flights-platform-infra/README.md.
       - name: Configure AWS credentials
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && vars.ECR_PUSH == 'true'
         uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -172,12 +173,12 @@ jobs:
           aws-region: eu-north-1
 
       - name: Log in to ECR
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && vars.ECR_PUSH == 'true'
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Push image to ECR
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && vars.ECR_PUSH == 'true'
         env:
           ECR_IMAGE: ${{ steps.ecr.outputs.registry }}/flights-${{ matrix.service }}
           TAG: ${{ steps.tag.outputs.tag }}
