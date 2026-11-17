@@ -16,6 +16,12 @@ RUN pip install --upgrade pip --quiet && \
 # ── Stage 2: minimal runtime image ───────────────────────────────────────────
 FROM python:3.12-slim
 
+# Pull in Debian security fixes published after the base image was built
+# (e.g. zlib1g CVE-2026-85091), so Trivy does not fail on already-fixed OS packages.
+RUN apt-get update && \
+    apt-get upgrade -y --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
+
 # Non-root runtime user. Numeric UID/GID so the kubelet can verify runAsNonRoot
 # (it cannot resolve a user name to check that it is not root).
 RUN groupadd --gid 10001 app && \
