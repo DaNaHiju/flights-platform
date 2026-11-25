@@ -19,10 +19,21 @@ RUN npm run build
 # is needed to bind a port. Only the static files and one config are copied in.
 FROM nginxinc/nginx-unprivileged:stable-alpine
 
-# The base image can lag behind Alpine's security fixes (Trivy flags them with a
-# fix available), so pull the patched packages. Root only for this one RUN.
+# The base image can lag behind security fixes that are already published, and
+# Trivy fails the build on those (CRITICAL/HIGH with a fix available). Two kinds:
+#   1. Alpine packages: `apk upgrade` against the image's own Alpine repos.
+#   2. nginx itself: it comes from nginx.org's apk repo, which the base image
+#      removes after installing, and /etc/apk/world pins the exact version. So
+#      plain `apk upgrade` never moves it. Re-adding every installed nginx*
+#      package by name (no version) from nginx.org's repo lifts the pin and
+#      installs the latest stable build. The packages are signature-checked with
+#      the nginx.org key the base image left in /etc/apk/keys.
+# Root only for this one RUN.
 USER root
-RUN apk upgrade --no-cache
+RUN apk upgrade --no-cache && \
+    NGINX_REPO="https://nginx.org/packages/alpine/v$(cut -d. -f1,2 /etc/alpine-release)/main" && \
+    apk add --no-cache --upgrade --repository "$NGINX_REPO" $(apk info | grep '^nginx') && \
+    nginx -v
 USER 101
 
 COPY services/web/nginx.conf /etc/nginx/conf.d/default.conf
