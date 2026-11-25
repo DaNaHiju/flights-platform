@@ -21,7 +21,7 @@ export function totalMinutes(offer: FlightOffer): number {
 }
 
 // Flight number + departure time of every leg: "LY381@2099-01-01T08:00:00|...".
-function offerSignature(offer: FlightOffer): string | null {
+export function offerSignature(offer: FlightOffer): string | null {
   if (offer.legs.length === 0) return null;
   return offer.legs.map((leg) => `${leg.flight_number}@${leg.departure_datetime}`).join("|");
 }
@@ -98,3 +98,69 @@ export function sortRanked<T>(list: Ranked<T>[], key: SortKey): Ranked<T>[] {
 }
 
 export const PAGE_SIZE = 10;
+
+/** One outbound flight and every round-trip pair that includes it. */
+export interface OutboundGroup {
+  key: string;
+  // The outbound of the cheapest pair: the one whose fare the "from" price is.
+  outbound: FlightOffer;
+  pairs: RoundTripOffer[];
+  minPrice: number;
+  currency: string;
+}
+
+/**
+ * Amadeus sells a round trip as ONE fare, so a return can only be chosen among
+ * the pairs that came with the chosen outbound. Group the pairs by outbound
+ * (same flight number and departure time in every leg) after dropping repeated
+ * pairs, using only what the search already returned.
+ */
+export function groupByOutbound(offers: RoundTripOffer[]): OutboundGroup[] {
+  const groups = new Map<string, OutboundGroup>();
+  for (const { item: pair } of dedupe(offers.map(rankRoundTrip))) {
+    const key = offerSignature(pair.outbound) ?? `id:${pair.outbound.offer_id}`;
+    const group = groups.get(key);
+    if (!group) {
+      groups.set(key, {
+        key,
+        outbound: pair.outbound,
+        pairs: [pair],
+        minPrice: pair.price,
+        currency: pair.currency,
+      });
+    } else {
+      group.pairs.push(pair);
+      if (pair.price < group.minPrice) {
+        group.minPrice = pair.price;
+        group.outbound = pair.outbound;
+      }
+    }
+  }
+  return [...groups.values()];
+}
+
+/** Step 1 of a round trip: ranked by the outbound alone, priced "from". */
+export function rankGroup(group: OutboundGroup): Ranked<OutboundGroup> {
+  return {
+    item: group,
+    key: group.key,
+    price: group.minPrice,
+    currency: group.currency,
+    duration: totalMinutes(group.outbound),
+    stops: group.outbound.stops,
+    signature: null,
+  };
+}
+
+/** Step 2 of a round trip: ranked by the return flight, priced as the whole trip. */
+export function rankReturn(pair: RoundTripOffer): Ranked<RoundTripOffer> {
+  return {
+    item: pair,
+    key: `${pair.outbound.offer_id}-${pair.return.offer_id}`,
+    price: pair.price,
+    currency: pair.currency,
+    duration: totalMinutes(pair.return),
+    stops: pair.return.stops,
+    signature: null,
+  };
+}

@@ -141,132 +141,252 @@ describe("App", () => {
   });
 });
 
-describe("multi-city", () => {
-  it("shows the error of a failed leg and still shows the other leg", async () => {
-    mockFetch([
-      ["origin=TLV", 200, { results: [offer("a", 150, "El Al")] }],
+// A one-way offer with one real flight, so it can be told apart and grouped.
+function flight(id: string, price: number, number: string, hour: string, over: Partial<Leg> = {}): FlightOffer {
+  return {
+    ...offer(id, price, "El Al", "LY"),
+    legs: [
+      leg({
+        flight_number: number,
+        airline_code: "LY",
+        departure_datetime: `2099-01-01T${hour}:00:00+02:00`,
+        arrival_datetime: `2099-01-01T${String(+hour.slice(0, 2) + 3).padStart(2, "0")}:00:00+01:00`,
+        ...over,
+      }),
+    ],
+  };
+}
+
+function pair(out: FlightOffer, back: FlightOffer, price: number, deepLink = "https://book.example/pair") {
+  return { price, currency: "USD", deep_link: deepLink, outbound: out, return: back };
+}
+
+// Book / Go to links; the header and footer have links of their own.
+const BOOKING = /^(Book|Go to)/;
+
+function chooseRow(index: number, name = "Flight results") {
+  fireEvent.click(rows(name).getAllByRole("button", { name: "Choose" })[index]);
+}
+
+function stepItem(label: string) {
+  return within(screen.getByRole("list", { name: "Steps" })).getByText(label).closest("li")!;
+}
+
+async function searchRoundTrip(results: unknown[]) {
+  mockFetch([["return_date=2099-01-08", 200, { results }]]);
+  render(<App />);
+  pickTrip("Round trip");
+  type("Origin", "tlv");
+  type("Destination", "ath");
+  type("Date", "2099-01-01");
+  type("Return", "2099-01-08");
+  fireEvent.click(screen.getByRole("button", { name: "Search" }));
+  await waitFor(() => expect(screen.getByRole("list", { name: "Outbound flights" })).toBeTruthy());
+}
+
+async function searchMultiCity(routes: [string, number, unknown][]) {
+  mockFetch(routes);
+  render(<App />);
+  pickTrip("Multi-city");
+  type("Origin", "tlv");
+  type("Destination", "ath");
+  type("Date", "2099-01-01");
+  type("Origin 2", "ath");
+  type("Destination 2", "tlv");
+  type("Date 2", "2099-01-08");
+  fireEvent.click(screen.getByRole("button", { name: "Search" }));
+}
+
+describe("round trip steps", () => {
+  const out1 = flight("o1", 0, "LY1", "08");
+  const out2 = flight("o2", 0, "LY2", "13");
+  const back1 = flight("r1", 0, "LY11", "09");
+  const back2 = flight("r2", 0, "LY12", "15");
+  const back3 = flight("r3", 0, "LY13", "18");
+  // two pairs share outbound LY1; a third pair has its own outbound
+  const results = [
+    pair(out1, back2, 1000, "https://book.example/b"),
+    pair(out1, back1, 900, "https://book.example/a"),
+    pair(out2, back3, 1200),
+  ];
+
+  it("groups the pairs by outbound: one row, the lowest price, N return options", async () => {
+    await searchRoundTrip(results);
+    const list = rows("Outbound flights");
+    expect(list.getAllByRole("button", { name: "Choose" })).toHaveLength(2);
+    expect(list.getByText("2 return options")).toBeTruthy();
+    expect(list.getByText("1 return option")).toBeTruthy();
+    expect(list.getByText("$900")).toBeTruthy();
+    expect(list.queryByText("$1,000")).toBeNull();
+    expect(list.getAllByText("from")).toHaveLength(2);
+    expect(screen.queryAllByRole("link", { name: BOOKING })).toHaveLength(0);
+  });
+
+  it("shows only the returns sold with the chosen outbound, each with the trip total", async () => {
+    await searchRoundTrip(results);
+    // best order puts the cheapest group (LY1) first
+    chooseRow(0, "Outbound flights");
+
+    const list = rows("Return flights");
+    expect(list.getAllByRole("button", { name: "Choose" })).toHaveLength(2);
+    expect(list.getByText("$900")).toBeTruthy();
+    expect(list.getByText("$1,000")).toBeTruthy();
+    expect(list.queryByText("$1,200")).toBeNull();
+    // sort tabs and paging still work in this step
+    expect(screen.getByRole("group", { name: "Sort Return flights" })).toBeTruthy();
+    expect(screen.getByText("2 results")).toBeTruthy();
+    expect(screen.queryAllByRole("link", { name: BOOKING })).toHaveLength(0);
+  });
+
+  it("reviews the whole trip with the pair's total, Book and Go to only there", async () => {
+    await searchRoundTrip(results);
+    chooseRow(0, "Outbound flights");
+    // the 15:00 return is the $1,000 pair, whose deep link is /b
+    fireEvent.click(
+      within(rows("Return flights").getByText(/15:00/).closest("li")!).getByRole("button", {
+        name: "Choose",
+      }),
+    );
+
+    const trip = within(screen.getByRole("list", { name: "Your trip" }));
+    expect(trip.getByText("$1,000")).toBeTruthy();
+    expect(trip.getByText("round trip")).toBeTruthy();
+    expect(trip.getAllByText(/layover|LY1|El Al/).length).toBeGreaterThan(0);
+    expect(trip.getAllByText("Outbound").length).toBeGreaterThan(0);
+    expect(trip.getAllByText("Return").length).toBeGreaterThan(0);
+    expect(trip.getByRole("link", { name: "Book" }).getAttribute("href")).toBe(
+      "https://book.example/b",
+    );
+    expect(trip.getByRole("link", { name: "Go to El Al" })).toBeTruthy();
+    expect(stepItem("Outbound").textContent).toContain("Change");
+    expect(stepItem("Return").textContent).toContain("Change");
+  });
+
+  it("Change goes back to that step and forgets the later choices", async () => {
+    await searchRoundTrip(results);
+    chooseRow(0, "Outbound flights");
+    chooseRow(0, "Return flights");
+    expect(screen.getByRole("list", { name: "Your trip" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Change Return" }));
+    expect(screen.queryByRole("list", { name: "Your trip" })).toBeNull();
+    expect(rows("Return flights").getAllByRole("button", { name: "Choose" })).toHaveLength(2);
+    expect(stepItem("Outbound").textContent).toContain("Change");
+    expect(stepItem("Return").textContent).not.toContain("Change");
+
+    fireEvent.click(screen.getByRole("button", { name: "Change Outbound" }));
+    expect(rows("Outbound flights").getAllByRole("button", { name: "Choose" })).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: /^Change/ })).toBeNull();
+  });
+});
+
+describe("multi-city steps", () => {
+  const routes: [string, number, unknown][] = [
+    ["origin=TLV", 200, { results: [flight("a", 150, "LY1", "08"), flight("b", 90, "FR1", "10")] }],
+    ["origin=ATH", 200, { results: [{ ...flight("c", 70, "A31", "09"), deep_link: "https://book.example/c" }] }],
+  ];
+
+  it("picks one flight per leg and reviews two tickets, each with its own Book", async () => {
+    await searchMultiCity(routes);
+    await waitFor(() => expect(screen.getByText(/Leg 1: TLV → ATH/)).toBeTruthy());
+    expect(screen.queryByText(/Leg 2/)).toBeNull();
+    expect(screen.queryAllByRole("link", { name: BOOKING })).toHaveLength(0);
+
+    chooseRow(0, "Flights, leg 1");
+    expect(screen.getByText(/Leg 2: ATH → TLV/)).toBeTruthy();
+    chooseRow(0, "Flights, leg 2");
+
+    expect(screen.getByText("2 tickets")).toBeTruthy();
+    // 90 + 70 (the best-ranked flight of leg 1 is the cheap, short one)
+    expect(screen.getByText(/Total: \$160/)).toBeTruthy();
+    expect(
+      screen.getByText("Separate bookings: if flight 1 is delayed, airline 2 won't wait for you."),
+    ).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Ticket 1" })).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Ticket 2" })).toBeTruthy();
+    // ticket 1 has no deep link in the mock, so only ticket 2 can be booked
+    expect(screen.queryByRole("link", { name: "Book ticket 1" })).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Book ticket 2" }).getAttribute("href"),
+    ).toBe("https://book.example/c");
+  });
+
+  it("offers a Book per ticket when both have a deep link", async () => {
+    const withLinks: [string, number, unknown][] = [
+      ["origin=TLV", 200, { results: [{ ...flight("a", 150, "LY1", "08"), deep_link: "https://book.example/a" }] }],
+      routes[1],
+    ];
+    await searchMultiCity(withLinks);
+    await waitFor(() => expect(screen.getByText(/Leg 1/)).toBeTruthy());
+    chooseRow(0, "Flights, leg 1");
+    chooseRow(0, "Flights, leg 2");
+    expect(screen.getByRole("link", { name: "Book ticket 1" }).getAttribute("href")).toBe(
+      "https://book.example/a",
+    );
+    expect(screen.getByRole("link", { name: "Book ticket 2" })).toBeTruthy();
+    expect(screen.getByText(/Total: \$220/)).toBeTruthy();
+  });
+
+  it("shows a failed leg's error at its own step", async () => {
+    await searchMultiCity([
+      routes[0],
       ["origin=ATH", 502, { error: "provider_unavailable" }],
     ]);
-
-    render(<App />);
-    pickTrip("Multi-city");
-    type("Origin", "tlv");
-    type("Destination", "ath");
-    type("Date", "2099-01-01");
-    type("Origin 2", "ath");
-    type("Destination 2", "tlv");
-    type("Date 2", "2099-01-08");
-    fireEvent.click(screen.getByRole("button", { name: "Search" }));
-
-    // exactly one error, and it is the provider-down message of leg 2
-    await waitFor(() =>
-      expect(screen.getByRole("alert").textContent).toBe(PROVIDER_DOWN_MESSAGE),
-    );
-    expect(screen.getAllByRole("alert")).toHaveLength(1);
-    // leg 1 still lists its offer
-    expect(rows("Flights, leg 1").getByText("$150")).toBeTruthy();
-    expect(screen.getByText(/Leg 1: TLV → ATH/)).toBeTruthy();
+    await waitFor(() => expect(screen.getByText(/Leg 1: TLV → ATH/)).toBeTruthy());
+    expect(screen.queryByRole("alert")).toBeNull();
+    chooseRow(0, "Flights, leg 1");
+    expect(screen.getByRole("alert").textContent).toBe(PROVIDER_DOWN_MESSAGE);
     expect(screen.getByText(/Leg 2: ATH → TLV/)).toBeTruthy();
-    // no total while a leg is missing
-    expect(screen.queryByText(/two separate tickets/)).toBeNull();
-  });
-
-  it("adds both legs into a total labelled as two separate tickets", async () => {
-    mockFetch([
-      ["origin=TLV", 200, { results: [offer("a", 150, "El Al"), offer("b", 90, "Ryanair")] }],
-      ["origin=ATH", 200, { results: [offer("c", 70, "Aegean Airlines")] }],
-    ]);
-
-    render(<App />);
-    pickTrip("Multi-city");
-    type("Origin", "tlv");
-    type("Destination", "ath");
-    type("Date", "2099-01-01");
-    type("Origin 2", "ath");
-    type("Destination 2", "tlv");
-    type("Date 2", "2099-01-08");
-    fireEvent.click(screen.getByRole("button", { name: "Search" }));
-
-    // cheapest of each leg: 90 + 70
-    await waitFor(() => expect(screen.getByText(/Total: \$160/)).toBeTruthy());
-    expect(screen.getByText(/price of two separate tickets/)).toBeTruthy();
   });
 });
 
-describe("round trip", () => {
-  it("sends return_date and lists the pair with one price", async () => {
-    mockFetch([
-      [
-        "return_date=2099-01-08",
-        200,
-        {
-          results: [
-            {
-              price: 166,
-              currency: "USD",
-              outbound: offer("o", 144, "El Al"),
-              return: offer("r", 166, "El Al"),
-            },
-          ],
-        },
-      ],
-    ]);
-
-    render(<App />);
-    pickTrip("Round trip");
-    type("Origin", "tlv");
-    type("Destination", "ath");
-    type("Date", "2099-01-01");
-    type("Return", "2099-01-08");
-    fireEvent.click(screen.getByRole("button", { name: "Search" }));
-
-    await waitFor(() => expect(rows().getByText("$166")).toBeTruthy());
-    expect(rows().getByText("round trip")).toBeTruthy();
-    expect(screen.queryByText("$144")).toBeNull();
-  });
-});
-
-describe("booking links", () => {
-  async function searchWith(airline: string, code: string | null, deepLink: string | null) {
-    mockFetch([["origin=TLV", 200, { results: [offer("a", 100, airline, code, deepLink)] }]]);
+describe("one way steps", () => {
+  async function searchOneWay(offers: FlightOffer[]) {
+    mockFetch([["origin=TLV", 200, { results: offers }]]);
     render(<App />);
     type("Origin", "tlv");
     type("Destination", "ath");
     type("Date", "2099-01-01");
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
-    await waitFor(() => expect(rows().getByText("$100")).toBeTruthy());
-    // the links live in the expanded part of the row
-    fireEvent.click(rows().getByRole("button"));
+    await waitFor(() => expect(rows().getAllByRole("button", { name: "Choose" }).length).toBeGreaterThan(0));
   }
 
-  it("books through the offer's deep link, and links the airline when it is mapped", async () => {
-    await searchWith("El Al Israel Airlines", "LY", "https://airline.example/deep?x=1");
+  it("goes Choose -> Review, and only Review has Book and Go to", async () => {
+    await searchOneWay([{ ...flight("a", 100, "LY1", "08"), deep_link: "https://airline.example/deep?x=1" }]);
+    expect(screen.queryAllByRole("link", { name: BOOKING })).toHaveLength(0);
+    fireEvent.click(rows().getByRole("button", { name: /\$100/ }));
+    expect(screen.queryAllByRole("link", { name: BOOKING })).toHaveLength(0);
 
-    const book = screen.getByRole("link", { name: "Book" });
+    chooseRow(0);
+    const review = within(screen.getByRole("list", { name: "Your flight" }));
+    const book = review.getByRole("link", { name: "Book" });
     expect(book.getAttribute("href")).toBe("https://airline.example/deep?x=1");
     expect(book.getAttribute("target")).toBe("_blank");
     expect(book.getAttribute("rel")).toBe("noopener noreferrer");
-
-    const airline = screen.getByRole("link", { name: "Go to El Al" });
+    const airline = review.getByRole("link", { name: "Go to El Al" });
     expect(airline.getAttribute("href")).toBe(airlineUrl("LY"));
     expect(airline.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(stepItem("Flight").textContent).toContain("Change");
   });
 
-  it("shows the offer without a Book link when it has no deep link", async () => {
-    await searchWith("Lufthansa", "LH", null);
-    expect(screen.queryByRole("link", { name: "Book" })).toBeNull();
-    expect(screen.getByRole("link", { name: "Go to Lufthansa" })).toBeTruthy();
-  });
-
-  it("has no airline link when the airline is not in the map", async () => {
-    await searchWith("Nowhere Air", "ZZ", "https://airline.example/deep");
-
-    expect(screen.getByRole("link", { name: "Book" })).toBeTruthy();
-    expect(screen.queryByRole("link", { name: /^Go to/ })).toBeNull();
+  it("has no Book without a deep link, and no Go to for an unmapped airline", async () => {
+    await searchOneWay([flight("a", 100, "ZZ1", "08", { airline_code: "ZZ" })]);
+    chooseRow(0);
+    expect(screen.queryAllByRole("link", { name: BOOKING })).toHaveLength(0);
     expect(airlineUrl(null)).toBeUndefined();
   });
-});
 
+  it("a new search starts over at the first step", async () => {
+    await searchOneWay([flight("a", 100, "LY1", "08")]);
+    chooseRow(0);
+    expect(screen.getByRole("list", { name: "Your flight" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await waitFor(() => expect(rows().getAllByRole("button", { name: "Choose" })).toHaveLength(1));
+    expect(screen.queryByRole("list", { name: "Your flight" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Change/ })).toBeNull();
+  });
+});
 
 function leg(over: Partial<Leg> = {}): Leg {
   return {
@@ -328,7 +448,7 @@ describe("offer details", () => {
     expect(rows().getByText("one way")).toBeTruthy();
     expect(screen.queryByText(/Ben Gurion International Airport/)).toBeNull();
 
-    fireEvent.click(rows().getByRole("button"));
+    fireEvent.click(rows().getByRole("button", { name: /\$100/ }));
     expect(screen.getByText(/Ben Gurion International Airport \(TLV\)/)).toBeTruthy();
     expect(screen.getByText(/Fiumicino\) International Airport \(FCO\)/)).toBeTruthy();
     expect(screen.getByText(/6h 20m · El Al LY381/)).toBeTruthy();
@@ -340,7 +460,7 @@ describe("offer details", () => {
       delete (old as unknown as Record<string, unknown>)[key];
     }
     await searchOne([{ ...offer("a", 100, "El Al"), legs: [old] }]);
-    fireEvent.click(rows().getByRole("button"));
+    fireEvent.click(rows().getByRole("button", { name: /\$100/ }));
     expect(screen.getByText(/Ben Gurion International Airport/)).toBeTruthy();
     expect(screen.getByText(/3h 20m/)).toBeTruthy();
   });
@@ -402,7 +522,7 @@ describe("deals", () => {
     expect(img.getAttribute("src")).toBe("/destinations/FCO.webp");
     expect(img.getAttribute("alt")).toBe("View of Rome, Italy");
     expect(img.getAttribute("loading")).toBe("lazy");
-    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryAllByRole("link", { name: BOOKING })).toHaveLength(0);
 
     // a missing photo leaves the gradient, without a broken image
     fireEvent.error(img);

@@ -21,6 +21,14 @@ interface Props {
   price: number;
   currency: string;
   deepLink?: string | null;
+  // "Choose" button in a list; the row is then a step of the selection.
+  onChoose?: () => void;
+  // Small text over the price ("from") and under it (defaults to one way / round trip).
+  pricePrefix?: string;
+  caption?: string;
+  // Review: start expanded and show Book / Go to. Lists never show them.
+  review?: boolean;
+  bookLabel?: string;
 }
 
 const first = (offer: FlightOffer): Leg | undefined => offer.legs[0];
@@ -149,7 +157,15 @@ function ExternalLink({ href, children }: { href: string; children: string }) {
 
 // "Book" is the offer's deep_link and only shows when there is one. "Go to
 // <airline>" shows for every airline of the trip that is in the static map.
-function Links({ deepLink, offers }: { deepLink?: string | null; offers: FlightOffer[] }) {
+function Links({
+  deepLink,
+  offers,
+  bookLabel,
+}: {
+  deepLink?: string | null;
+  offers: FlightOffer[];
+  bookLabel: string;
+}) {
   const codes = offers.flatMap((o) =>
     o.legs.length > 0 ? o.legs.map((leg) => leg.airline_code) : [o.primary_airline_code],
   );
@@ -157,7 +173,7 @@ function Links({ deepLink, offers }: { deepLink?: string | null; offers: FlightO
   if (!deepLink && known.length === 0) return null;
   return (
     <div className="links">
-      {deepLink && <ExternalLink href={deepLink}>Book</ExternalLink>}
+      {deepLink && <ExternalLink href={deepLink}>{bookLabel}</ExternalLink>}
       {known.map((code) => (
         <ExternalLink key={code} href={airlineUrl(code)!}>
           {`Go to ${AIRLINES[code.toUpperCase()].name}`}
@@ -167,14 +183,24 @@ function Links({ deepLink, offers }: { deepLink?: string | null; offers: FlightO
   );
 }
 
-export function FlightRow({ directions, price, currency, deepLink }: Props) {
-  const [open, setOpen] = useState(false);
+export function FlightRow({
+  directions,
+  price,
+  currency,
+  deepLink,
+  onChoose,
+  pricePrefix,
+  caption,
+  review = false,
+  bookLabel = "Book",
+}: Props) {
+  const [open, setOpen] = useState(review);
   const detailId = useId();
   const offers = directions.map((d) => d.offer);
   const roundTrip = directions.length > 1;
 
   return (
-    <li className={`flight-row${open ? " open" : ""}`}>
+    <li className={`flight-row${open ? " open" : ""}${onChoose ? " has-choose" : ""}`}>
       <button
         type="button"
         className="fr-summary"
@@ -188,10 +214,16 @@ export function FlightRow({ directions, price, currency, deepLink }: Props) {
           ))}
         </span>
         <span className="fr-price">
+          {pricePrefix && <small className="fr-from">{pricePrefix}</small>}
           <strong>{formatPrice(price, currency)}</strong>
-          <small>{roundTrip ? "round trip" : "one way"}</small>
+          <small>{caption ?? (roundTrip ? "round trip" : "one way")}</small>
         </span>
       </button>
+      {onChoose && (
+        <button type="button" className="fr-choose" onClick={onChoose}>
+          Choose
+        </button>
+      )}
       {open && (
         <div className="fr-detail" id={detailId}>
           {directions.map((d, i) => (
@@ -200,7 +232,7 @@ export function FlightRow({ directions, price, currency, deepLink }: Props) {
               <Timeline offer={d.offer} />
             </section>
           ))}
-          <Links deepLink={deepLink} offers={offers} />
+          {review && <Links deepLink={deepLink} offers={offers} bookLabel={bookLabel} />}
         </div>
       )}
     </li>
