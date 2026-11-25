@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ApiError, listDeals, searchFlights, searchRoundTrip } from "./api";
 import { DealItem } from "./DealItem";
+import { displayCode } from "./format";
 import { OneWayItem, RoundTripItem } from "./OfferItem";
 import { SearchForm } from "./SearchForm";
 import type { Deal, FlightOffer, RoundTripOffer, SearchQuery } from "./types";
@@ -119,13 +120,7 @@ export default function App() {
           ) : (
             <ul className="offers">
               {results.offers.map((offer) => (
-                <OneWayItem
-                  key={offer.offer_id}
-                  offer={offer}
-                  origin={results.query.origin}
-                  destination={results.query.destination}
-                  date={results.query.date}
-                />
+                <OneWayItem key={offer.offer_id} offer={offer} />
               ))}
             </ul>
           ))}
@@ -139,10 +134,6 @@ export default function App() {
                 <RoundTripItem
                   key={`${offer.outbound.offer_id}-${offer.return.offer_id}`}
                   offer={offer}
-                  origin={results.query.origin}
-                  destination={results.query.destination}
-                  date={results.query.date}
-                  returnDate={results.query.returnDate}
                 />
               ))}
             </ul>
@@ -154,20 +145,15 @@ export default function App() {
             {results.legs.map((leg, i) => (
               <div key={i}>
                 <h3>
-                  Leg {i + 1}: {leg.origin} → {leg.destination} · {leg.date}
+                  Leg {i + 1}: {displayCode(leg.origin)} → {displayCode(leg.destination)} ·{" "}
+                  {leg.date}
                 </h3>
                 {leg.error && <p role="alert">{leg.error}</p>}
                 {leg.offers?.length === 0 && <p>No flights found for this leg.</p>}
                 {leg.offers && leg.offers.length > 0 && (
                   <ul className="offers">
                     {leg.offers.map((offer) => (
-                      <OneWayItem
-                        key={offer.offer_id}
-                        offer={offer}
-                        origin={leg.origin}
-                        destination={leg.destination}
-                        date={leg.date}
-                      />
+                      <OneWayItem key={offer.offer_id} offer={offer} />
                     ))}
                   </ul>
                 )}

@@ -42,3 +42,24 @@ export function placeLabel({ code, city, countryCode, airportName }: Place): str
 export function secondaryAirport({ city, countryCode, airportName }: Place): string | null {
   return city && countryCode && airportName ? airportName : null;
 }
+
+/**
+ * "2099-01-01T08:00:00+02:00" -> "08:00". The API sends each airport's LOCAL
+ * time with its offset; slicing keeps it as is. Formatting through Date would
+ * convert it to the viewer's timezone, which is wrong for flight times.
+ */
+export function localTime(iso: string): string {
+  return iso.slice(11, 16);
+}
+
+/** Days between the calendar dates of two local timestamps (0, 1, ...). */
+export function dayDifference(fromIso: string, toIso: string): number {
+  const from = Date.UTC(+fromIso.slice(0, 4), +fromIso.slice(5, 7) - 1, +fromIso.slice(8, 10));
+  const to = Date.UTC(+toIso.slice(0, 4), +toIso.slice(5, 7) - 1, +toIso.slice(8, 10));
+  return Math.round((to - from) / 86_400_000);
+}
+
+/** Search code for display: "MAD+" (one airport) shows as "MAD". */
+export function displayCode(code: string): string {
+  return code.replace(/\+$/, "");
+}

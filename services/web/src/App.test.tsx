@@ -10,13 +10,20 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { PROVIDER_DOWN_MESSAGE } from "./api";
-import { airlineDisplayName, airlineUrl } from "./airlines";
+import { airlineUrl } from "./airlines";
+import { resolveCode } from "./AirportInput";
 import { SearchForm } from "./SearchForm";
 import { DealItem } from "./DealItem";
-import { countryName, formatDuration, placeLabel } from "./format";
+import { countryName, dayDifference, formatDuration, localTime, placeLabel } from "./format";
 import type { Deal, FlightOffer, Leg } from "./types";
 
-function offer(id: string, price: number, airline: string): FlightOffer {
+function offer(
+  id: string,
+  price: number,
+  airline: string,
+  code: string | null = null,
+  deepLink: string | null = null,
+): FlightOffer {
   return {
     offer_id: id,
     price,
@@ -24,6 +31,8 @@ function offer(id: string, price: number, airline: string): FlightOffer {
     duration_minutes: 200,
     stops: 0,
     primary_airline: airline,
+    primary_airline_code: code,
+    deep_link: deepLink,
     legs: [],
   };
 }
@@ -204,8 +213,8 @@ describe("round trip", () => {
 });
 
 describe("booking links", () => {
-  async function searchWith(airline: string) {
-    mockFetch([["origin=TLV", 200, { results: [offer("a", 100, airline)] }]]);
+  async function searchWith(airline: string, code: string | null, deepLink: string | null) {
+    mockFetch([["origin=TLV", 200, { results: [offer("a", 100, airline, code, deepLink)] }]]);
     render(<App />);
     type("Origin", "tlv");
     type("Destination", "ath");
@@ -214,35 +223,31 @@ describe("booking links", () => {
     await waitFor(() => expect(screen.getByText(/100 USD/)).toBeTruthy());
   }
 
-  it("always has a Google Flights link, and an airline link when the airline is mapped", async () => {
-    await searchWith("El Al");
+  it("books through the offer's deep link, and links the airline when it is mapped", async () => {
+    await searchWith("El Al Israel Airlines", "LY", "https://airline.example/deep?x=1");
 
     const book = screen.getByRole("link", { name: "Book" });
-    expect(book.getAttribute("href")).toContain("https://www.google.com/travel/flights?q=");
-    expect(decodeURIComponent(book.getAttribute("href")!)).toContain(
-      "Flights to ATH from TLV on 2099-01-01 oneway",
-    );
+    expect(book.getAttribute("href")).toBe("https://airline.example/deep?x=1");
     expect(book.getAttribute("target")).toBe("_blank");
     expect(book.getAttribute("rel")).toBe("noopener noreferrer");
 
     const airline = screen.getByRole("link", { name: "Go to El Al" });
-    expect(airline.getAttribute("href")).toBe(airlineUrl("El Al"));
+    expect(airline.getAttribute("href")).toBe(airlineUrl("LY"));
     expect(airline.getAttribute("rel")).toBe("noopener noreferrer");
   });
 
-  it("shows corrected airline names in the airline button", async () => {
-    await searchWith("Lufthansa Cargo");
+  it("shows the offer without a Book link when it has no deep link", async () => {
+    await searchWith("Lufthansa", "LH", null);
+    expect(screen.queryByRole("link", { name: "Book" })).toBeNull();
     expect(screen.getByRole("link", { name: "Go to Lufthansa" })).toBeTruthy();
-    expect(airlineUrl("Lufthansa Cargo")).toBe("https://www.lufthansa.com");
-    expect(airlineDisplayName("Alitalia")).toBe("ITA Airways");
-    expect(airlineDisplayName("Nowhere Air")).toBe("Nowhere Air");
   });
 
   it("has no airline link when the airline is not in the map", async () => {
-    await searchWith("Nowhere Air");
+    await searchWith("Nowhere Air", "ZZ", "https://airline.example/deep");
 
     expect(screen.getByRole("link", { name: "Book" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: /^Go to/ })).toBeNull();
+    expect(airlineUrl(null)).toBeUndefined();
   });
 });
 
@@ -361,7 +366,7 @@ describe("deals", () => {
     departure_date: "2099-02-01",
     price: 120,
     currency: "USD",
-    airline: "Alitalia",
+    airline: "ITA Airways",
   };
 
   it("shows origin → destination with city, country and airport", () => {
@@ -406,5 +411,104 @@ describe("language", () => {
       if (name.endsWith(".test.tsx")) continue;
       expect(spanish.test(source as string), name).toBe(false);
     }
+  });
+});
+
+describe("airport typeahead", () => {
+  const madrid = [
+    {
+      id: "CMAD",
+      iata_code: "MAD",
+      sub_type: "CITY",
+      name: "Madrid",
+      city_name: "Madrid",
+      country_name: "Spain",
+      search_code: "MAD",
+    },
+    {
+      id: "AMAD",
+      iata_code: "MAD",
+      sub_type: "AIRPORT",
+      name: "Adolfo Suarez Barajas",
+      city_name: "Madrid",
+      country_name: "Spain",
+      search_code: "MAD+",
+    },
+  ];
+
+  it("suggests airports and cities and searches with the picked code", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.startsWith("/api/deals")) {
+        return Promise.resolve(new Response(JSON.stringify({ deals: [] })));
+      }
+      if (url.startsWith("/api/locations")) {
+        return Promise.resolve(new Response(JSON.stringify({ results: madrid })));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ results: [] })));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+    type("Origin", "tlv");
+    type("Destination", "madr");
+
+    const list = await screen.findByRole("listbox", { name: "Destination suggestions" });
+    const option = within(list).getByRole("option", {
+      name: /Adolfo Suarez Barajas, Madrid \(MAD\)/,
+    });
+    expect(within(list).getByRole("option", { name: /^City Madrid \(MAD\)/ })).toBeTruthy();
+    fireEvent.mouseDown(option);
+    expect((screen.getByLabelText("Destination") as HTMLInputElement).value).toBe(
+      "Adolfo Suarez Barajas, Madrid (MAD)",
+    );
+
+    type("Date", "2099-01-01");
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(([url]) => String(url).includes("destination=MAD%2B"))).toBe(
+        true,
+      ),
+    );
+    // The keyword went to our backend; the browser never talks to Amadeus.
+    expect(fetchMock.mock.calls.every(([url]) => String(url).startsWith("/api/"))).toBe(true);
+  });
+
+  it("does not ask for suggestions under two characters", async () => {
+    const fetchMock = vi.fn((url: string) =>
+      Promise.resolve(
+        new Response(JSON.stringify(url.includes("/deals") ? { deals: [] } : { results: [] })),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+    type("Origin", "t");
+    await new Promise((r) => setTimeout(r, 350));
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/locations"))).toBe(false);
+  });
+
+  it("refuses to submit free text that is neither picked nor a code", () => {
+    const onSearch = vi.fn();
+    render(<SearchForm onSearch={onSearch} disabled={false} />);
+    type("Origin", "Tel Aviv");
+    type("Destination", "MAD");
+    type("Date", "2099-01-01");
+    fireEvent.submit(screen.getByRole("button", { name: "Search" }).closest("form")!);
+    expect(onSearch).not.toHaveBeenCalled();
+    expect(screen.getByText(/Pick an airport or city from the list/)).toBeTruthy();
+  });
+
+  it("resolves typed codes and picked codes", () => {
+    expect(resolveCode({ text: "tlv", code: null })).toBe("TLV");
+    expect(resolveCode({ text: "Madrid (MAD)", code: "MAD+" })).toBe("MAD+");
+    expect(resolveCode({ text: "Madrid", code: null })).toBe("");
+  });
+});
+
+describe("local times", () => {
+  it("shows airport-local times without converting them", () => {
+    expect(localTime("2099-01-01T23:15:00+01:00")).toBe("23:15");
+    expect(localTime("2099-01-01T21:00:00Z")).toBe("21:00");
+    expect(dayDifference("2027-03-27T18:00:00Z", "2027-03-29T09:40:00+08:00")).toBe(2);
   });
 });

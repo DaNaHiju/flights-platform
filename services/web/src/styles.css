@@ -31,11 +31,6 @@ section {
 
 .search input {
   padding: 0.4rem;
-  text-transform: uppercase;
-}
-
-.search input[type="date"] {
-  text-transform: none;
 }
 
 .offers {
@@ -93,4 +88,53 @@ section {
 
 .layover {
   color: #666;
+}
+
+/* Origin/destination typeahead */
+.airport {
+  position: relative;
+}
+
+.suggestions {
+  position: absolute;
+  z-index: 10;
+  top: 100%;
+  left: 0;
+  min-width: 18rem;
+  margin: 0.2rem 0 0;
+  padding: 0.2rem 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #d0d5dd;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.08);
+}
+
+.suggestions li {
+  padding: 0.4rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.suggestions li[aria-selected="true"],
+.suggestions li:hover {
+  background: #eef2f7;
+}
+
+.badge {
+  display: inline-block;
+  min-width: 3.2rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: #5b6573;
+}
+
+.times {
+  font-variant-numeric: tabular-nums;
+}
+
+.form-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: #8a1c10;
 }

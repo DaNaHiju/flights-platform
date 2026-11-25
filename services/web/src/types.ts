@@ -1,10 +1,16 @@
 // Shapes of the flights-api responses (see services/api/docs and shared/schemas.py).
 
 export interface Leg {
+  // Resolved airline name; the IATA code is in airline_code.
   airline: string;
+  airline_code?: string | null;
   flight_number: string;
+  // Name of the airline that actually flies it, when it differs (codeshare).
+  operating_airline?: string | null;
   departure_airport: string;
   arrival_airport: string;
+  // Local time at each airport with its UTC offset, as the API sends it.
+  // Display it as is: never convert it to the viewer's timezone.
   departure_datetime: string;
   arrival_datetime: string;
   duration_minutes: number;
@@ -25,6 +31,11 @@ export interface FlightOffer {
   total_duration_minutes?: number;
   stops: number;
   primary_airline: string;
+  primary_airline_code?: string | null;
+  carriers?: string[];
+  merchant?: string | null;
+  // Redirects to the airline's booking page. Absent on some offers.
+  deep_link?: string | null;
   legs: Leg[];
 }
 
@@ -49,8 +60,25 @@ export interface Deal {
 export interface RoundTripOffer {
   price: number;
   currency: string;
+  merchant?: string | null;
+  deep_link?: string | null;
   outbound: FlightOffer;
   return: FlightOffer;
+}
+
+// GET /locations: one airport or city for the origin/destination typeahead.
+export interface Location {
+  id: string;
+  iata_code: string;
+  sub_type: "AIRPORT" | "CITY";
+  name: string;
+  detailed_name?: string | null;
+  city_name?: string | null;
+  city_code?: string | null;
+  country_name?: string | null;
+  country_code?: string | null;
+  // What to send as origin/destination: "MAD+" pins one airport, "MAD" a whole city.
+  search_code: string;
 }
 
 export type TripMode = "one-way" | "round-trip" | "multi-city";
