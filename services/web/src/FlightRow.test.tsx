@@ -60,10 +60,16 @@ const connecting = offer(
   { duration_minutes: 1100 },
 );
 
-function row(o: FlightOffer, deepLink: string | null = "https://book.example/x") {
+function row(o: FlightOffer, deepLink: string | null = "https://book.example/x", review = false) {
   render(
     <ul>
-      <FlightRow directions={[{ offer: o }]} price={o.price} currency="ILS" deepLink={deepLink} />
+      <FlightRow
+        directions={[{ offer: o }]}
+        price={o.price}
+        currency="ILS"
+        deepLink={deepLink}
+        review={review}
+      />
     </ul>,
   );
 }
@@ -80,7 +86,7 @@ describe("FlightRow closed", () => {
     expect(screen.getByText("1 stop · FCO")).toBeTruthy();
     expect(screen.getByText("₪800")).toBeTruthy();
     expect(screen.getByText("one way")).toBeTruthy();
-    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryAllByRole("link", { name: /^(Book|Go to)/ })).toHaveLength(0);
   });
 });
 
@@ -115,18 +121,22 @@ describe("FlightRow open", () => {
     expect(screen.getByText(/7h 50m\s+layover/)).toBeTruthy();
   });
 
-  it("shows Book only with a deep link, and Go to for mapped airlines", () => {
-    row(connecting, null);
+  it("never shows Book or Go to in a list, only in review", () => {
+    row(connecting);
     fireEvent.click(screen.getByRole("button"));
+    expect(screen.queryAllByRole("link", { name: /^(Book|Go to)/ })).toHaveLength(0);
+  });
+
+  it("shows Book only with a deep link, and Go to for mapped airlines (review)", () => {
+    row(connecting, null, true);
     expect(screen.queryByRole("link", { name: "Book" })).toBeNull();
     expect(screen.getByRole("link", { name: "Go to ITA Airways" })).toBeTruthy();
     // ANA is not in the map
     expect(screen.queryByRole("link", { name: "Go to ANA" })).toBeNull();
   });
 
-  it("books through the deep link", () => {
-    row(connecting);
-    fireEvent.click(screen.getByRole("button"));
+  it("books through the deep link (review)", () => {
+    row(connecting, "https://book.example/x", true);
     expect(screen.getByRole("link", { name: "Book" }).getAttribute("href")).toBe(
       "https://book.example/x",
     );
@@ -169,5 +179,28 @@ describe("FlightRow round trip", () => {
     fireEvent.click(screen.getByRole("button"));
     expect(screen.getAllByText("Outbound").length).toBeGreaterThan(0);
     expect(screen.getByText(/AZ810/)).toBeTruthy();
+  });
+});
+
+describe("FlightRow choose", () => {
+  it("has a Choose button next to the row that does not expand it", () => {
+    let chosen = 0;
+    render(
+      <ul>
+        <FlightRow
+          directions={[{ offer: connecting }]}
+          price={800}
+          currency="ILS"
+          pricePrefix="from"
+          caption="2 return options"
+          onChoose={() => chosen++}
+        />
+      </ul>,
+    );
+    expect(screen.getByText("from")).toBeTruthy();
+    expect(screen.getByText("2 return options")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Choose" }));
+    expect(chosen).toBe(1);
+    expect(screen.queryByText(/layover/)).toBeNull();
   });
 });

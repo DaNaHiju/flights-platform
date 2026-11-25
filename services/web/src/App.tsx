@@ -1,11 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError, listDeals, searchFlights, searchRoundTrip } from "./api";
 import { DealItem } from "./DealItem";
-import { displayCode, formatPrice } from "./format";
 import { PlaneIcon } from "./Icons";
-import { FlightRow } from "./FlightRow";
-import { rankOneWay, rankRoundTrip } from "./results";
-import { ResultsList } from "./ResultsList";
+import { MultiCityFlow, OneWayFlow, RoundTripFlow, type LegSearch } from "./Flows";
 import { SearchForm, type Prefill } from "./SearchForm";
 import type { Deal, FlightOffer, RoundTripOffer, SearchQuery } from "./types";
 
@@ -13,21 +10,11 @@ function errorText(err: unknown): string {
   return err instanceof ApiError ? err.message : "Something went wrong.";
 }
 
-// One leg of a multi-city trip. Each leg is searched on its own, so one can fail
-// (e.g. the provider answers 502) while the other still shows its results.
-interface Leg {
-  origin: string;
-  destination: string;
-  date: string;
-  offers?: FlightOffer[];
-  error?: string;
-}
-
 async function searchLeg(
   origin: string,
   destination: string,
   date: string,
-): Promise<Leg> {
+): Promise<LegSearch> {
   try {
     return { origin, destination, date, offers: await searchFlights(origin, destination, date) };
   } catch (err) {
@@ -38,68 +25,7 @@ async function searchLeg(
 type Results =
   | { kind: "one-way"; query: SearchQuery; offers: FlightOffer[] }
   | { kind: "round-trip"; query: SearchQuery; offers: RoundTripOffer[] }
-  | { kind: "multi-city"; legs: Leg[] };
-
-function cheapest(offers: FlightOffer[] | undefined): FlightOffer | undefined {
-  return offers?.reduce<FlightOffer | undefined>(
-    (best, o) => (!best || o.price < best.price ? o : best),
-    undefined,
-  );
-}
-
-function OneWayList({ offers, label }: { offers: FlightOffer[]; label?: string }) {
-  const ranked = useMemo(() => offers.map(rankOneWay), [offers]);
-  return (
-    <ResultsList
-      results={ranked}
-      label={label}
-      renderRow={(offer) => (
-        <FlightRow
-          directions={[{ offer }]}
-          price={offer.price}
-          currency={offer.currency}
-          deepLink={offer.deep_link}
-        />
-      )}
-    />
-  );
-}
-
-function RoundTripList({ offers }: { offers: RoundTripOffer[] }) {
-  const ranked = useMemo(() => offers.map(rankRoundTrip), [offers]);
-  return (
-    <ResultsList
-      results={ranked}
-      renderRow={(offer) => (
-        <FlightRow
-          directions={[
-            { label: "Outbound", offer: offer.outbound },
-            { label: "Return", offer: offer.return },
-          ]}
-          price={offer.price}
-          currency={offer.currency}
-          deepLink={offer.deep_link}
-        />
-      )}
-    />
-  );
-}
-
-function MultiCityTotal({ legs }: { legs: Leg[] }) {
-  const picks = legs.map((leg) => cheapest(leg.offers));
-  if (picks.some((p) => !p) || new Set(picks.map((p) => p!.currency)).size !== 1) {
-    return null;
-  }
-  const total = picks.reduce((sum, p) => sum + p!.price, 0);
-  return (
-    <p className="total">
-      <strong>
-        Total: {formatPrice(total, picks[0]!.currency)}
-      </strong>{" "}
-      (cheapest option of each leg; price of two separate tickets)
-    </p>
-  );
-}
+  | { kind: "multi-city"; legs: LegSearch[] };
 
 function Brand({ footer = false }: { footer?: boolean }) {
   return (
@@ -241,36 +167,17 @@ export default function App() {
                 (results.offers.length === 0 ? (
                   <p className="status">No flights found for this search.</p>
                 ) : (
-                  <OneWayList offers={results.offers} />
+                  <OneWayFlow offers={results.offers} />
                 ))}
 
               {results?.kind === "round-trip" &&
                 (results.offers.length === 0 ? (
                   <p className="status">No flights found for this search.</p>
                 ) : (
-                  <RoundTripList offers={results.offers} />
+                  <RoundTripFlow offers={results.offers} />
                 ))}
 
-              {results?.kind === "multi-city" && (
-                <>
-                  <MultiCityTotal legs={results.legs} />
-                  {results.legs.map((leg, i) => (
-                    <div key={i}>
-                      <h3 className="leg-title">
-                        Leg {i + 1}: {displayCode(leg.origin)} → {displayCode(leg.destination)} ·{" "}
-                        {leg.date}
-                      </h3>
-                      {leg.error && <p role="alert">{leg.error}</p>}
-                      {leg.offers?.length === 0 && (
-                        <p className="status">No flights found for this leg.</p>
-                      )}
-                      {leg.offers && leg.offers.length > 0 && (
-                        <OneWayList offers={leg.offers} label={`Flights, leg ${i + 1}`} />
-                      )}
-                    </div>
-                  ))}
-                </>
-              )}
+              {results?.kind === "multi-city" && <MultiCityFlow legs={results.legs} />}
             </div>
           </section>
         )}
