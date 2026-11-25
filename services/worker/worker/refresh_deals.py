@@ -8,16 +8,16 @@ the CronJob object itself.
 from datetime import datetime, timedelta, timezone
 
 from shared.cache import set_json
-from shared.providers import ProviderUnavailableError, search_one_way
+from shared.providers import ProviderError, ProviderNotConfiguredError, get_provider
 from shared.schemas import deal_airport_fields
 from shared.utils.logging import log
 from worker.config import settings
 
 DEALS_CACHE_KEY = "deals:top"
 
-# Fixed set of popular routes searched from FLIGHTS_DEFAULT_ORIGIN. There's
-# no Amadeus-style "inspiration search" equivalent in fli, so top deals are
-# just the cheapest offer per destination in this list, sorted by price.
+# Fixed set of popular routes searched from FLIGHTS_DEFAULT_ORIGIN: top deals
+# are the cheapest offer per destination in this list, sorted by price. Each
+# run costs one provider search per destination (8 every 6 h), well inside quota.
 POPULAR_DESTINATIONS = ["MAD", "JFK", "LHR", "CDG", "FCO", "BKK", "BCN", "AMS"]
 
 SEARCH_HORIZON_DAYS = 30
@@ -33,34 +33,36 @@ def refresh_deals() -> int:
         datetime.now(timezone.utc) + timedelta(days=SEARCH_HORIZON_DAYS)
     ).strftime("%Y-%m-%d")
 
+    provider = get_provider()
     deals = []
     for destination in POPULAR_DESTINATIONS:
         try:
-            offers = search_one_way(
+            offers = provider.search_one_way(
                 origin, destination, travel_date, 1, settings.FLIGHTS_CURRENCY
             )
-        except ProviderUnavailableError as exc:
+        except ProviderNotConfiguredError as exc:
+            # Same answer for every destination: stop instead of logging 8 times.
+            log.warning("Skipping all deals: %s", exc)
+            break
+        except ProviderError as exc:
             log.warning("Skipping deal for %s->%s: %s", origin, destination, exc)
             continue
 
         if not offers:
             continue
 
-        cheapest = min(offers, key=lambda o: o["price"])
-        primary_airline = (
-            cheapest.get("primary_airline_name")
-            or cheapest.get("primary_airline")
-            or ""
-        )
+        cheapest = min(offers, key=lambda o: o.price)
         deals.append(
             {
                 "destination": destination,
                 "departure_date": travel_date,
-                "price": cheapest["price"],
-                "currency": cheapest["currency"],
-                "airline": primary_airline,
+                "price": cheapest.price,
+                "currency": cheapest.currency,
+                "airline": cheapest.primary_airline,
                 **deal_airport_fields(origin, destination),
-                "total_duration_minutes": cheapest.get("duration"),
+                "total_duration_minutes": cheapest.total_duration_minutes,
+                # No deep_link on purpose: prices are live and a deal can be
+                # 6 h old, so the user re-searches the route to book it.
             }
         )
 

@@ -1,4 +1,4 @@
-"""Tests for the deals refresh job. fli is always mocked — no network calls."""
+"""Tests for the deals refresh job. The provider is always a stub — no network calls."""
 
 import importlib
 import json
@@ -6,28 +6,47 @@ import os
 
 import pytest
 
-from shared.providers import ProviderUnavailableError
+from shared.providers import ProviderNotConfiguredError, ProviderUnavailableError
+from shared.schemas import FlightOffer
 from worker import refresh_deals as job
 from worker.config import settings
 
 
-def _offer(price: float, airline: str = "El Al") -> dict:
-    """Return the subset of a raw fli result that refresh_deals reads."""
-    return {"price": price, "currency": "USD", "primary_airline_name": airline}
+def _offer(price: float, airline: str = "El Al", duration: int = 315) -> FlightOffer:
+    """A provider-neutral offer; refresh_deals reads price, airline and duration."""
+    return FlightOffer(
+        offer_id=f"{airline}-{price}",
+        price=price,
+        currency="USD",
+        duration_minutes=duration,
+        total_duration_minutes=duration,
+        stops=0,
+        primary_airline=airline,
+        deep_link="https://example.test/book",
+        legs=[],
+    )
 
 
-@pytest.fixture
-def fake_search(monkeypatch):
-    """Replace search_one_way; *results* maps destination -> offers or exception."""
-    results: dict = {}
+class StubProvider:
+    name = "stub"
 
-    def search_one_way(origin, destination, date, adults, currency):
-        outcome = results.get(destination, [])
+    def __init__(self, results: dict):
+        self.results = results
+        self.calls = 0
+
+    def search_one_way(self, origin, destination, date, adults, currency):
+        self.calls += 1
+        outcome = self.results.get(destination, [])
         if isinstance(outcome, Exception):
             raise outcome
         return outcome
 
-    monkeypatch.setattr(job, "search_one_way", search_one_way)
+
+@pytest.fixture
+def fake_search(monkeypatch):
+    """Stub the provider; *results* maps destination -> offers or exception."""
+    results: dict = {}
+    monkeypatch.setattr(job, "get_provider", lambda: StubProvider(results))
     return results
 
 
@@ -49,7 +68,7 @@ def test_caches_cheapest_offer_per_destination_sorted_by_price(fake_search, fake
 
 
 def test_provider_error_skips_only_that_destination(fake_search, fake_redis):
-    fake_search["MAD"] = ProviderUnavailableError("google changed shape")
+    fake_search["MAD"] = ProviderUnavailableError("gateway timeout")
     fake_search["LHR"] = [_offer(120)]
 
     assert job.refresh_deals() == 1
@@ -70,7 +89,7 @@ def test_zero_deals_keeps_previous_cache(fake_search, fake_redis):
 
 
 def test_zero_deals_logs_warning(fake_search, caplog):
-    fake_search["MAD"] = ProviderUnavailableError("fli returned no payload (None)")
+    fake_search["MAD"] = ProviderUnavailableError("gateway timeout")
 
     with caplog.at_level("WARNING", logger=job.log.name):
         assert job.refresh_deals() == 0
@@ -118,7 +137,7 @@ def test_cache_ttl_is_read_from_env(monkeypatch):
 
 
 def test_deals_carry_airport_and_duration_fields(fake_search, fake_redis):
-    fake_search["MAD"] = [dict(_offer(250), duration=315)]
+    fake_search["MAD"] = [_offer(250, duration=315)]
 
     job.refresh_deals()
 
@@ -142,4 +161,18 @@ def test_deal_for_airport_missing_in_airportsdata_has_null_city(
     deal = _cached(fake_redis)["deals"][0]
     assert deal["destination_city"] is None
     assert deal["destination_country_code"] is None
-    assert deal["total_duration_minutes"] is None
+
+
+def test_deals_do_not_store_deep_links(fake_search, fake_redis):
+    # Prices are live; a deal can be hours old, so it must be re-searched to book.
+    fake_search["MAD"] = [_offer(250)]
+    job.refresh_deals()
+    assert "deep_link" not in _cached(fake_redis)["deals"][0]
+
+
+def test_missing_api_key_stops_after_first_destination(monkeypatch, fake_redis):
+    stub = StubProvider({d: ProviderNotConfiguredError("no key") for d in job.POPULAR_DESTINATIONS})
+    monkeypatch.setattr(job, "get_provider", lambda: stub)
+    assert job.refresh_deals() == 0
+    assert stub.calls == 1
+    assert job.DEALS_CACHE_KEY not in fake_redis.store

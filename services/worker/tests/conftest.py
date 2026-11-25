@@ -11,6 +11,8 @@ os.environ["REDIS_URL"] = "redis://redis.invalid:6379/0"
 # Removed, not just left unset: proves the worker imports and runs without a
 # database even when a developer has DATABASE_URL exported in their shell.
 os.environ.pop("DATABASE_URL", None)
+# Never reach the real Amadeus gateway from a test run.
+os.environ.pop("AMADEUS_API_KEY", None)
 
 from shared import cache  # noqa: E402
 

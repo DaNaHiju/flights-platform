@@ -18,8 +18,8 @@ from app.database import Base
 class BookingORM(Base):
     """SQLAlchemy model for the bookings table.
 
-    offer_snapshot stores the complete, untrimmed fli response for the
-    booked offer — not the trimmed FlightOffer shape (shared/schemas.py).
+    offer_snapshot stores the booked offer exactly as GET /flights returned
+    it (the FlightOffer shape, shared/schemas.py), deep_link included.
     See docs/api-contract.md section 4.
     """
 

@@ -1,26 +1,36 @@
-"""Pydantic schemas for flight offers, shared by the API and the worker."""
+"""Provider-neutral schemas shared by the API and the worker.
+
+Every FlightProvider returns these models, whatever its own wire format. That
+is what makes the provider swappable: the API, the cache, the bookings table
+and the frontend only ever see the shapes defined here.
+"""
 
 from __future__ import annotations
 
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
-from shared.airports import airport_name, city_and_country, iata_from_airport
+from shared.airports import airport_name, city_and_country
 
 
 class Leg(BaseModel):
-    """A single flight leg inside a FlightOffer."""
+    """A single flight (segment) inside a FlightOffer."""
 
+    # Resolved airline name (e.g. "British Airways"); the code is kept alongside.
     airline: str
+    airline_code: Optional[str] = None
+    # Marketing carrier code + number, e.g. "BA322".
     flight_number: str
+    # Name of the airline that actually flies it, when it differs (codeshare).
+    operating_airline: Optional[str] = None
     departure_airport: str
     arrival_airport: str
+    # Local time at each airport WITH its UTC offset, exactly as the provider
+    # sent it. Never convert these to the viewer's timezone.
     departure_datetime: str
     arrival_datetime: str
     duration_minutes: int
-    # Added fields (None when the airport is not in airportsdata); old
-    # consumers ignore them.
     departure_airport_code: Optional[str] = None
     arrival_airport_code: Optional[str] = None
     departure_city: Optional[str] = None
@@ -30,24 +40,58 @@ class Leg(BaseModel):
 
 
 class FlightOffer(BaseModel):
-    """Public flight offer shape.
+    """One priced itinerary in one direction (one bound)."""
 
-    This is a subset of fli's raw response. amenities, legroom,
-    co2_emissions, aircraft, and layovers are deliberately excluded —
-    they're Google Flights' own presentation detail and add noise to the
-    booking use case, which only needs price, schedule, and airline
-    identity. See docs/api-contract.md section 3.
-    """
-
+    # Stable id built from the itinerary; POST /bookings looks the offer up by it.
     offer_id: str
     price: float
     currency: str
     duration_minutes: int
-    # Same value as duration_minutes, named for what it is: the whole itinerary.
+    # Same value as duration_minutes, named for what it is: the whole itinerary,
+    # first departure to last arrival, including layovers.
     total_duration_minutes: int
     stops: int
     primary_airline: str
+    primary_airline_code: Optional[str] = None
+    # Every distinct airline name on the itinerary, in flight order.
+    carriers: List[str] = Field(default_factory=list)
+    # Airline that sells the offer (its IATA code).
+    merchant: Optional[str] = None
+    # Redirects to the airline's own booking page. Optional: some offers have none.
+    deep_link: Optional[str] = None
     legs: List[Leg]
+
+
+class RoundTripOffer(BaseModel):
+    """An outbound + return pair, sold and priced together."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    price: float
+    currency: str
+    merchant: Optional[str] = None
+    deep_link: Optional[str] = None
+    outbound: FlightOffer
+    # "return" is a Python keyword, so the attribute is return_ and the JSON key
+    # stays "return" (dump with by_alias=True).
+    return_: FlightOffer = Field(alias="return")
+
+
+class Location(BaseModel):
+    """An airport or a city, as offered by the origin/destination typeahead."""
+
+    id: str
+    iata_code: str
+    sub_type: str  # "AIRPORT" or "CITY"
+    name: str
+    detailed_name: Optional[str] = None
+    city_name: Optional[str] = None
+    city_code: Optional[str] = None
+    country_name: Optional[str] = None
+    country_code: Optional[str] = None
+    # The value to send as origin/destination: "LHR+" pins one airport,
+    # "LON" covers every airport of the city.
+    search_code: str
 
 
 class Deal(BaseModel):
@@ -58,7 +102,6 @@ class Deal(BaseModel):
     price: float
     currency: str
     airline: str
-    # Added fields. Deals cached before they existed lack them; readers must tolerate that.
     origin: Optional[str] = None
     origin_airport_name: Optional[str] = None
     origin_city: Optional[str] = None
@@ -67,6 +110,16 @@ class Deal(BaseModel):
     destination_city: Optional[str] = None
     destination_country_code: Optional[str] = None
     total_duration_minutes: Optional[int] = None
+
+
+def airport_fields(prefix: str, code: str | None) -> dict:
+    """Code, airport name, city and country of an airport, keyed with *prefix*."""
+    city, country = city_and_country(code)
+    return {
+        f"{prefix}_airport_code": code,
+        f"{prefix}_city": city,
+        f"{prefix}_country_code": country,
+    }
 
 
 def deal_airport_fields(origin: str, destination: str) -> dict:
@@ -82,42 +135,3 @@ def deal_airport_fields(origin: str, destination: str) -> dict:
         "destination_city": d_city,
         "destination_country_code": d_country,
     }
-
-
-def _leg_from_raw(leg: dict) -> Leg:
-    dep = iata_from_airport(leg["departure_airport"])
-    arr = iata_from_airport(leg["arrival_airport"])
-    dep_city, dep_country = city_and_country(dep)
-    arr_city, arr_country = city_and_country(arr)
-    return Leg(
-        airline=leg["airline"],
-        flight_number=leg["flight_number"],
-        departure_airport=leg["departure_airport"],
-        arrival_airport=leg["arrival_airport"],
-        departure_datetime=leg["departure_datetime"],
-        arrival_datetime=leg["arrival_datetime"],
-        duration_minutes=leg["duration"],
-        departure_airport_code=dep,
-        arrival_airport_code=arr,
-        departure_city=dep_city,
-        arrival_city=arr_city,
-        departure_country_code=dep_country,
-        arrival_country_code=arr_country,
-    )
-
-
-def flight_offer_from_raw(raw: dict) -> FlightOffer:
-    """Trim a raw fli FlightResult dict down to the public FlightOffer shape."""
-    primary_airline = (
-        raw.get("primary_airline_name") or raw.get("primary_airline") or ""
-    )
-    return FlightOffer(
-        offer_id=raw["booking_token"],
-        price=raw["price"],
-        currency=raw["currency"],
-        duration_minutes=raw["duration"],
-        total_duration_minutes=raw["duration"],
-        stops=raw["stops"],
-        primary_airline=primary_airline,
-        legs=[_leg_from_raw(leg) for leg in raw["legs"]],
-    )

@@ -3,27 +3,9 @@
 from fastapi.testclient import TestClient
 
 from shared.cache import set_json
+from tests.test_flights import make_offer
 
-RAW_OFFER = {
-    "legs": [
-        {
-            "airline": "Air Europa",
-            "flight_number": "1302",
-            "departure_airport": "Ben Gurion International Airport",
-            "arrival_airport": "Madrid Barajas International Airport",
-            "departure_datetime": "2099-01-01T16:05:00",
-            "arrival_datetime": "2099-01-01T20:20:00",
-            "duration": 315,
-        }
-    ],
-    "price": 1839.0,
-    "currency": "USD",
-    "duration": 315,
-    "stops": 0,
-    "primary_airline": "Air Europa",
-    "primary_airline_name": "Air Europa",
-    "booking_token": "TOKEN123",
-}
+RAW_OFFER = make_offer("TOKEN123", price=1839.0).model_dump(mode="json")
 
 VALID_PAYLOAD = {
     "offer_id": "TOKEN123",
@@ -54,6 +36,14 @@ def test_create_booking_success(client: TestClient):
 def test_create_booking_offer_expired(client: TestClient):
     """No matching offer:{token} in cache — treated as an expired offer."""
     response = client.post("/bookings/", json={**VALID_PAYLOAD, "offer_id": "MISSING"})
+    assert response.status_code == 409
+    assert response.json() == {"error": "offer_expired"}
+
+
+def test_offer_cached_in_an_old_shape_is_treated_as_expired(client: TestClient):
+    # An entry written by the previous (fli-based) release under the same key.
+    set_json("offer:TOKEN123", {"booking_token": "TOKEN123", "price": 1.0}, ttl=600)
+    response = client.post("/bookings/", json=VALID_PAYLOAD)
     assert response.status_code == 409
     assert response.json() == {"error": "offer_expired"}
 

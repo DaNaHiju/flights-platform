@@ -33,7 +33,7 @@ async def lifespan(application: FastAPI):
 
 app = FastAPI(
     title="Flights API",
-    description="FastAPI booking service backed by fli (reverse-engineered Google Flights).",
+    description="Flight search and booking service backed by the Amadeus Travel Builder APIs.",
     version=settings.APP_VERSION,
     lifespan=lifespan,
 )
@@ -49,7 +49,8 @@ app = FastAPI(
 async def flat_http_exception_handler(request: Request, exc: HTTPException):
     """Unwrap dict `detail` payloads so error bodies match docs/api-contract.md."""
     content = exc.detail if isinstance(exc.detail, dict) else {"error": exc.detail}
-    return JSONResponse(status_code=exc.status_code, content=content)
+    # Headers are kept: a rate-limited answer carries Retry-After.
+    return JSONResponse(status_code=exc.status_code, content=content, headers=exc.headers)
 
 
 # ---------------------------------------------------------------------------

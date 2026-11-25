@@ -10,7 +10,7 @@ from app.database import get_db
 from app.db_models import BookingCreate, BookingORM, BookingResponse
 from app.utils.metrics import bookings_created
 from shared.cache import get_json
-from shared.schemas import flight_offer_from_raw
+from shared.schemas import FlightOffer
 from shared.utils.logging import log
 
 router = APIRouter()
@@ -20,11 +20,11 @@ router = APIRouter()
 def create_booking(payload: dict, db: Session = Depends(get_db)):
     """Register a booking against a previously returned offer.
 
-    Frozen-intent booking: the offer is not re-confirmed against fli here
-    (Google Flights isn't a real booking backend and we don't own seat
-    inventory) — we only require that the offer is still sitting in the
-    offer:{offer_id} cache written by GET /flights. A miss there means the
-    offer is gone from cache, which we treat as expired.
+    Frozen-intent booking: the offer is not re-confirmed against the provider
+    here (the real purchase happens on the airline's site, through the offer's
+    deep_link, and we don't own seat inventory). We only require that the
+    offer is still in the offer:{offer_id} cache written by GET /flights. A
+    miss there means the offer is gone from cache, which we treat as expired.
     """
     try:
         booking_in = BookingCreate(**payload)
@@ -35,13 +35,16 @@ def create_booking(payload: dict, db: Session = Depends(get_db)):
         ) from exc
 
     raw_offer = get_json(f"offer:{booking_in.offer_id}")
-    if raw_offer is None:
+    try:
+        offer = FlightOffer.model_validate(raw_offer) if raw_offer is not None else None
+    except ValidationError:
+        # An entry cached by an older release in another shape: treat as expired.
+        offer = None
+    if offer is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={"error": "offer_expired"},
         )
-
-    offer = flight_offer_from_raw(raw_offer)
 
     booking = BookingORM(
         offer_id=booking_in.offer_id,

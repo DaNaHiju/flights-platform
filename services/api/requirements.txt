@@ -7,7 +7,9 @@ pydantic==2.10.4
 sqlalchemy==2.0.23
 psycopg2-binary==2.9.9
 redis==5.2.1
-flights==0.9.0
+# HTTP client for the Amadeus Travel Builder APIs (shared/providers/amadeus.py):
+# per-request timeouts, connection pooling, and a mock transport for tests.
+httpx==0.28.1
 # Offline airport -> city/country lookup (MIT). Needed by shared/airports.py.
 airportsdata==20261030
 prometheus-client==0.19.0

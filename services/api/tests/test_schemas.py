@@ -1,90 +1,35 @@
-"""Airport enrichment and duration fields of the public schemas. No network."""
+"""Airport enrichment and the public schema shapes. No network."""
 
-from fastapi.testclient import TestClient
-
-from fli.models import Airport
-
-from shared.schemas import flight_offer_from_raw
-from tests.test_flights import RAW_OFFER
+from shared.airports import airport_name, city_and_country
+from shared.schemas import FlightOffer, RoundTripOffer, deal_airport_fields
+from tests.test_flights import make_offer
 
 
-def _raw(dep: str, arr: str, legs: int = 1) -> dict:
-    leg = dict(RAW_OFFER["legs"][0], departure_airport=dep, arrival_airport=arr)
-    return dict(RAW_OFFER, legs=[leg] * legs)
+def test_airport_name_city_and_country_come_from_airportsdata():
+    assert airport_name("MAD")
+    assert city_and_country("TLV") == ("Tel Aviv", "IL")
 
 
-def test_leg_has_code_city_and_country():
-    leg = flight_offer_from_raw(RAW_OFFER).legs[0]
-    assert leg.departure_airport_code == "TLV"
-    assert leg.arrival_airport_code == "MAD"
-    assert (leg.departure_city, leg.departure_country_code) == ("Tel Aviv", "IL")
-    assert (leg.arrival_city, leg.arrival_country_code) == ("Madrid", "ES")
-    # Existing fields are untouched.
-    assert leg.departure_airport == "Ben Gurion International Airport"
+def test_unknown_airport_resolves_to_none():
+    assert airport_name("ZZZ") is None
+    assert city_and_country("ZZZ") == (None, None)
+    assert airport_name(None) is None
 
 
-def test_code_not_in_airportsdata_gives_null_city_and_country():
-    # PBI exists in fli but not in airportsdata.
-    offer = flight_offer_from_raw(_raw(Airport.PBI.value, Airport.TLV.value))
-    leg = offer.legs[0]
-    assert leg.departure_airport_code == "PBI"
-    assert leg.departure_city is None
-    assert leg.departure_country_code is None
-    assert leg.arrival_city == "Tel Aviv"
+def test_deal_airport_fields():
+    fields = deal_airport_fields("TLV", "FCO")
+    assert fields["origin"] == "TLV"
+    assert (fields["destination_city"], fields["destination_country_code"]) == ("Rome", "IT")
 
 
-def test_unknown_airport_name_gives_null_code():
-    leg = flight_offer_from_raw(_raw("Nowhere Field", "Nowhere Field")).legs[0]
-    assert leg.departure_airport_code is None
-    assert leg.departure_city is None
+def test_flight_offer_round_trips_through_json():
+    # What the cache stores is exactly what bookings reads back.
+    offer = make_offer()
+    assert FlightOffer.model_validate(offer.model_dump(mode="json")) == offer
 
 
-def test_total_duration_and_leg_duration():
-    offer = flight_offer_from_raw(RAW_OFFER)
-    assert offer.total_duration_minutes == 315 == offer.duration_minutes
-    assert offer.legs[0].duration_minutes == 315
-
-
-def test_old_cached_offer_without_new_fields_still_parses():
-    # A raw offer cached before this change has exactly the old keys.
-    assert "departure_airport_code" not in RAW_OFFER["legs"][0]
-    assert flight_offer_from_raw(RAW_OFFER).legs[0].arrival_airport_code == "MAD"
-
-
-def test_response_keeps_every_old_field_and_adds_new_ones(
-    client: TestClient, monkeypatch, fake_redis
-):
-    monkeypatch.setattr("app.api.flights.is_valid_iata", lambda c: True)
-    monkeypatch.setattr(
-        "app.api.flights.search_one_way", lambda *a, **k: [RAW_OFFER]
-    )
-    body = client.get(
-        "/flights/", params={"origin": "TLV", "destination": "MAD", "date": "2099-01-01"}
-    ).json()
-    offer = body["results"][0]
-    for key in ("offer_id", "price", "currency", "duration_minutes", "stops",
-                "primary_airline", "legs"):
-        assert key in offer
-    assert offer["total_duration_minutes"] == 315
-    assert offer["legs"][0]["arrival_city"] == "Madrid"
-    for key in ("airline", "flight_number", "departure_airport", "arrival_airport",
-                "departure_datetime", "arrival_datetime", "duration_minutes"):
-        assert key in offer["legs"][0]
-
-
-def test_round_trip_both_legs_have_duration_and_airports(
-    client: TestClient, monkeypatch, fake_redis
-):
-    monkeypatch.setattr("app.api.flights.is_valid_iata", lambda c: True)
-    back = _raw("Madrid Barajas International Airport", "Ben Gurion International Airport")
-    pair = {"price": 900.0, "currency": "USD", "outbound": RAW_OFFER, "return": back}
-    monkeypatch.setattr("app.api.flights.search_round_trip", lambda *a, **k: [pair])
-    body = client.get(
-        "/flights/",
-        params={"origin": "TLV", "destination": "MAD", "date": "2099-01-01",
-                "return_date": "2099-01-10"},
-    ).json()
-    result = body["results"][0]
-    assert result["outbound"]["total_duration_minutes"] == 315
-    assert result["return"]["total_duration_minutes"] == 315
-    assert result["return"]["legs"][0]["departure_airport_code"] == "MAD"
+def test_round_trip_offer_serializes_return_key():
+    pair = RoundTripOffer(price=1.0, currency="USD", outbound=make_offer(), return_=make_offer())
+    dumped = pair.model_dump(by_alias=True)
+    assert "return" in dumped and "return_" not in dumped
+    assert RoundTripOffer.model_validate(dumped) == pair

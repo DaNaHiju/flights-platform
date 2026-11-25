@@ -1,15 +1,13 @@
-"""Airport enrichment: IATA code, city and country for the public schemas.
+"""Airport enrichment: airport name, city and country for an IATA code.
 
-fli models airports as an enum whose NAME is the IATA code and whose VALUE is
-the airport name. `model_dump(mode="json")` keeps only the value, so the code
-has to be recovered from the name. City and country come from `airportsdata`
-(MIT, bundled CSV, no network). Anything missing resolves to None.
+Data comes from `airportsdata` (MIT, bundled CSV, no network), so enriching a
+search result never costs an extra provider call. Anything missing resolves to
+None: the provider can return airports that the dataset does not know.
 """
 
 from functools import lru_cache
 
 import airportsdata
-from fli.models import Airport
 
 
 @lru_cache(maxsize=1)
@@ -17,23 +15,10 @@ def _airports() -> dict:
     return airportsdata.load("IATA")
 
 
-def iata_from_airport(value: str | None) -> str | None:
-    """IATA code for fli's airport name (or for a code, returned as is)."""
-    if not value:
-        return None
-    if value in Airport.__members__:
-        return value
-    try:
-        return Airport(value).name
-    except ValueError:
-        return None
-
-
 def airport_name(code: str | None) -> str | None:
-    """fli's airport name for an IATA code, None when unknown."""
-    if not code or code not in Airport.__members__:
-        return None
-    return Airport[code].value
+    """Airport name for an IATA airport code, None when unknown."""
+    info = _airports().get(code) if code else None
+    return (info.get("name") or None) if info else None
 
 
 def city_and_country(code: str | None) -> tuple[str | None, str | None]:
