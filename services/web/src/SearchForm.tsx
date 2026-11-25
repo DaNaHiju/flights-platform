@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { AirportInput, EMPTY_AIRPORT, resolveCode, type AirportValue } from "./AirportInput";
+import { SearchIcon, SwapIcon } from "./Icons";
 import type { SearchQuery, TripMode } from "./types";
 
 interface Props {
@@ -44,69 +45,122 @@ export function SearchForm({ onSearch, disabled }: Props) {
     });
   }
 
+  function swapCities() {
+    setOrigin(destination);
+    setDestination(origin);
+  }
+
+  const submit = (
+    <button type="submit" className="primary-btn" disabled={disabled}>
+      <SearchIcon />
+      Search
+    </button>
+  );
+
   return (
     <form onSubmit={handleSubmit} className="search">
-      <label>
-        Trip type
-        <select value={mode} onChange={(e) => setMode(e.target.value as TripMode)}>
+      <div className="search-top">
+        <div className="trip-tabs" role="group" aria-label="Trip type">
           {MODES.map((m) => (
-            <option key={m.value} value={m.value}>
+            <button
+              key={m.value}
+              type="button"
+              className="trip-tab"
+              aria-pressed={mode === m.value}
+              onClick={() => setMode(m.value)}
+            >
               {m.label}
-            </option>
+            </button>
           ))}
-        </select>
-      </label>
-      <AirportInput label="Origin" value={origin} onChange={setOrigin} placeholder="City or airport" />
-      <AirportInput label="Destination" value={destination} onChange={setDestination} placeholder="City or airport" />
-      <label>
-        Date
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          required
-        />
-      </label>
-      {mode === "round-trip" && (
-        <label>
-          Return
-          <input
-            type="date"
-            value={returnDate}
-            min={date}
-            onChange={(e) => setReturnDate(e.target.value)}
-            required
-          />
-        </label>
-      )}
-      {mode === "multi-city" && (
-        <>
+        </div>
+        <span className="search-note">Pick a city or airport, or type a 3-letter code</span>
+      </div>
+
+      {mode !== "multi-city" && (
+        <div className="fields">
+          <AirportInput label="Origin" value={origin} onChange={setOrigin} placeholder="City or airport" />
+          <button
+            type="button"
+            className="swap"
+            aria-label="Swap origin and destination"
+            title="Swap"
+            onClick={swapCities}
+          >
+            <SwapIcon />
+          </button>
           <AirportInput
-            label="Origin 2"
-            value={origin2}
-            onChange={setOrigin2}
-            placeholder="City or airport"
-          />
-          <AirportInput
-            label="Destination 2"
-            value={destination2}
-            onChange={setDestination2}
+            label="Destination"
+            value={destination}
+            onChange={setDestination}
             placeholder="City or airport"
           />
           <label>
-            Date 2
-            <input
-              type="date"
-              value={date2}
-              onChange={(e) => setDate2(e.target.value)}
-              required
-            />
+            Date
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
           </label>
+          {mode === "round-trip" ? (
+            <label>
+              Return
+              <input
+                type="date"
+                value={returnDate}
+                min={date}
+                onChange={(e) => setReturnDate(e.target.value)}
+                required
+              />
+            </label>
+          ) : (
+            <span aria-hidden="true" />
+          )}
+          {submit}
+        </div>
+      )}
+
+      {mode === "multi-city" && (
+        <>
+          <div className="multi-fields">
+            <div className="multi-leg">
+              <h3>Flight 1</h3>
+              <div className="multi-leg-fields">
+                <AirportInput label="Origin" value={origin} onChange={setOrigin} placeholder="City or airport" />
+                <AirportInput
+                  label="Destination"
+                  value={destination}
+                  onChange={setDestination}
+                  placeholder="City or airport"
+                />
+                <label>
+                  Date
+                  <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+                </label>
+              </div>
+            </div>
+            <div className="multi-leg">
+              <h3>Flight 2</h3>
+              <div className="multi-leg-fields">
+                <AirportInput
+                  label="Origin 2"
+                  value={origin2}
+                  onChange={setOrigin2}
+                  placeholder="City or airport"
+                />
+                <AirportInput
+                  label="Destination 2"
+                  value={destination2}
+                  onChange={setDestination2}
+                  placeholder="City or airport"
+                />
+                <label>
+                  Date 2
+                  <input type="date" value={date2} onChange={(e) => setDate2(e.target.value)} required />
+                </label>
+              </div>
+            </div>
+          </div>
+          <div className="search-actions">{submit}</div>
         </>
       )}
-      <button type="submit" disabled={disabled}>
-        Search
-      </button>
+
       {formError && <p className="form-error">{formError}</p>}
     </form>
   );

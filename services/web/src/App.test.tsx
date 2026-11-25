@@ -55,6 +55,11 @@ function mockFetch(routes: [string, number, unknown][]) {
   );
 }
 
+// The trip type is a group of toggle buttons (tabs), not a select.
+function pickTrip(name: string) {
+  fireEvent.click(within(screen.getByLabelText("Trip type")).getByRole("button", { name }));
+}
+
 function type(label: string, value: string) {
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 }
@@ -77,15 +82,16 @@ describe("SearchForm", () => {
   it("offers the three trip types and shows the extra fields of each", () => {
     render(<SearchForm onSearch={() => {}} disabled={false} />);
 
-    const selector = screen.getByLabelText("Trip type");
-    const options = within(selector).getAllByRole("option").map((o) => o.textContent);
-    expect(options).toEqual(["One way", "Round trip", "Multi-city"]);
+    const tabs = within(screen.getByLabelText("Trip type")).getAllByRole("button");
+    expect(tabs.map((t) => t.textContent)).toEqual(["One way", "Round trip", "Multi-city"]);
+    expect(tabs[0].getAttribute("aria-pressed")).toBe("true");
 
     expect(screen.queryByLabelText("Return")).toBeNull();
-    fireEvent.change(selector, { target: { value: "round-trip" } });
+    pickTrip("Round trip");
     expect(screen.getByLabelText("Return")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Round trip" }).getAttribute("aria-pressed")).toBe("true");
 
-    fireEvent.change(selector, { target: { value: "multi-city" } });
+    pickTrip("Multi-city");
     expect(screen.queryByLabelText("Return")).toBeNull();
     expect(screen.getByLabelText("Origin 2")).toBeTruthy();
     expect(screen.getByLabelText("Destination 2")).toBeTruthy();
@@ -130,9 +136,7 @@ describe("multi-city", () => {
     ]);
 
     render(<App />);
-    fireEvent.change(screen.getByLabelText("Trip type"), {
-      target: { value: "multi-city" },
-    });
+    pickTrip("Multi-city");
     type("Origin", "tlv");
     type("Destination", "ath");
     type("Date", "2099-01-01");
@@ -161,9 +165,7 @@ describe("multi-city", () => {
     ]);
 
     render(<App />);
-    fireEvent.change(screen.getByLabelText("Trip type"), {
-      target: { value: "multi-city" },
-    });
+    pickTrip("Multi-city");
     type("Origin", "tlv");
     type("Destination", "ath");
     type("Date", "2099-01-01");
@@ -198,9 +200,7 @@ describe("round trip", () => {
     ]);
 
     render(<App />);
-    fireEvent.change(screen.getByLabelText("Trip type"), {
-      target: { value: "round-trip" },
-    });
+    pickTrip("Round trip");
     type("Origin", "tlv");
     type("Destination", "ath");
     type("Date", "2099-01-01");

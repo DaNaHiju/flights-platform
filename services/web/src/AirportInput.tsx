@@ -99,7 +99,7 @@ export function AirportInput({ label, value, onChange, placeholder }: Props) {
   }
 
   return (
-    <div className="airport">
+    <div className="airport-field">
       <label>
         {label}
         <input
