@@ -474,20 +474,7 @@ h3 {
   color: var(--teal);
 }
 
-.route {
-  margin-top: 6px;
-  color: var(--navy);
-  font-weight: 700;
-}
 
-.times {
-  margin-top: 2px;
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  color: var(--navy);
-  font-variant-numeric: tabular-nums;
-}
 
 .airport {
   color: var(--muted);
@@ -495,25 +482,8 @@ h3 {
   font-weight: 500;
 }
 
-.segments {
-  margin: 12px 0 0;
-  padding: 12px 0 0 1.2rem;
-  border-top: 1px solid var(--line);
-  font-size: 12px;
-}
 
-.offers .segments li {
-  background: none;
-  border: 0;
-  padding: 0;
-  margin: 0 0 6px;
-  border-radius: 0;
-}
 
-.layover {
-  color: var(--teal);
-  font-weight: 700;
-}
 
 .links {
   display: flex;
@@ -546,24 +516,377 @@ h3 {
   gap: 19px;
 }
 
-.deals-grid > li {
-  box-shadow: 0 8px 25px rgb(16 44 64 / 0.055);
+
+
+
+/* ── Flight rows ────────────────────────────────────────────────────────── */
+.offers > li.flight-row {
+  padding: 0;
+  overflow: hidden;
+  transition: box-shadow 0.15s;
+}
+
+.flight-row:hover,
+.flight-row.open {
+  box-shadow: 0 8px 25px rgb(16 44 64 / 0.08);
+}
+
+.fr-summary {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  padding: 16px 22px;
   border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
 }
 
-.deals-grid > li > strong:first-child {
-  display: block;
-  font-size: 17px;
+.fr-summary:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: -2px;
+  border-radius: 16px;
+}
+
+.fr-lines {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.fr-line {
+  display: grid;
+  grid-template-columns: minmax(90px, 0.8fr) minmax(220px, 2fr) minmax(110px, 0.9fr);
+  align-items: center;
+  gap: 18px;
+}
+
+.fr-airlines {
   color: var(--navy);
+  font-weight: 700;
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
-.deal-price {
+.fr-label {
   display: block;
-  margin: 10px 0 4px;
-  font-size: 22px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--teal);
+}
+
+.fr-times {
+  display: grid;
+  gap: 2px;
+  text-align: center;
+}
+
+.fr-clock {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+}
+
+.fr-clock sup {
+  font-size: 10px;
+  color: var(--teal);
+  letter-spacing: 0;
+}
+
+.fr-dotted {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.fr-dotted::before,
+.fr-dotted::after {
+  content: "";
+  flex: 1;
+  border-top: 2px dotted #a9c3c6;
+}
+
+.fr-codes {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.fr-stops {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.fr-price {
+  display: grid;
+  justify-items: end;
+  line-height: 1.1;
+}
+
+.fr-price strong {
+  font-size: 27px;
   font-weight: 800;
   letter-spacing: -0.05em;
   color: var(--teal);
+}
+
+.fr-price small {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.fr-detail {
+  padding: 4px 22px 20px;
+  border-top: 1px solid var(--line);
+  background: #fbfdfc;
+}
+
+.fr-detail h4 {
+  margin: 16px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--teal);
+}
+
+.timeline {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.offers .timeline li {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.tl-flight {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  padding-left: 26px;
+  color: var(--navy);
+  font-size: 13px;
+}
+
+/* the vertical line, with a dot at each end of the flight */
+.tl-flight::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 8px;
+  bottom: 8px;
+  border-left: 2px solid var(--teal);
+}
+
+.tl-stop {
+  position: relative;
+}
+
+.tl-stop::before {
+  content: "";
+  position: absolute;
+  left: -26px;
+  top: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--white);
+  border: 2px solid var(--teal);
+}
+
+.tl-stop b {
+  font-variant-numeric: tabular-nums;
+  margin-right: 4px;
+}
+
+.tl-info {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tl-layover {
+  margin: 14px 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--mint);
+  color: var(--teal-dark);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tl-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--navy);
+  color: var(--white);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+}
+
+.tl-badge.warn {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* ── Sort tabs, count, show more ────────────────────────────────────────── */
+.sort-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.sort-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.sort-tab {
+  display: grid;
+  gap: 1px;
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--navy);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sort-tab small {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.sort-tab[aria-pressed="true"] {
+  background: var(--teal);
+  color: var(--white);
+}
+
+.sort-tab[aria-pressed="true"] small {
+  color: #d6efee;
+}
+
+.result-count {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.show-more {
+  display: block;
+  margin: 18px auto 0;
+  padding: 11px 26px;
+  border: 1px solid var(--teal);
+  border-radius: 12px;
+  background: var(--white);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--teal);
+  cursor: pointer;
+}
+
+.show-more:hover {
+  background: var(--mint);
+}
+
+/* ── Deal cards ─────────────────────────────────────────────────────────── */
+.deals-grid > li.deal-card {
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  box-shadow: 0 8px 25px rgb(16 44 64 / 0.055);
+}
+
+.deal-photo {
+  aspect-ratio: 8 / 5;
+  background: linear-gradient(135deg, var(--teal) 0%, #4fb3b0 55%, #a8dcd3 100%);
+}
+
+.deal-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.deal-body {
+  display: grid;
+  gap: 4px;
+  padding: 16px 20px 20px;
+}
+
+.deal-title {
+  font-size: 18px;
+  letter-spacing: -0.03em;
+  color: var(--navy);
+}
+
+.deal-route,
+.deal-meta {
+  font-size: 12px;
+}
+
+.deal-price {
+  margin: 8px 0 2px;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  color: var(--teal);
+}
+
+.deal-price small {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+.deal-btn {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--teal);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--white);
+  cursor: pointer;
+}
+
+.deal-btn:hover {
+  background: var(--teal-dark);
 }
 
 /* ── Footer ─────────────────────────────────────────────────────────────── */
@@ -599,6 +922,14 @@ h3 {
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 950px) {
+  .fr-line {
+    grid-template-columns: minmax(80px, 0.8fr) minmax(190px, 2fr);
+  }
+
+  .fr-stops {
+    grid-column: 2;
+  }
+
   .fields {
     grid-template-columns: 1fr 34px 1fr;
   }
@@ -613,6 +944,37 @@ h3 {
 }
 
 @media (max-width: 700px) {
+  .fr-summary {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+
+  .fr-line {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .fr-stops {
+    grid-column: 1;
+    text-align: center;
+  }
+
+  .fr-price {
+    justify-items: start;
+    grid-auto-flow: column;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .fr-detail {
+    padding: 4px 16px 18px;
+  }
+
+  .sort-tab {
+    padding: 8px 12px;
+  }
+
   .wrap {
     width: min(100% - 32px, 1180px);
   }

@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, listDeals, searchFlights, searchRoundTrip } from "./api";
 import { DealItem } from "./DealItem";
-import { displayCode } from "./format";
+import { displayCode, formatPrice } from "./format";
 import { PlaneIcon } from "./Icons";
-import { OneWayItem, RoundTripItem } from "./OfferItem";
-import { SearchForm } from "./SearchForm";
+import { FlightRow } from "./FlightRow";
+import { rankOneWay, rankRoundTrip } from "./results";
+import { ResultsList } from "./ResultsList";
+import { SearchForm, type Prefill } from "./SearchForm";
 import type { Deal, FlightOffer, RoundTripOffer, SearchQuery } from "./types";
 
 function errorText(err: unknown): string {
@@ -45,6 +47,44 @@ function cheapest(offers: FlightOffer[] | undefined): FlightOffer | undefined {
   );
 }
 
+function OneWayList({ offers, label }: { offers: FlightOffer[]; label?: string }) {
+  const ranked = useMemo(() => offers.map(rankOneWay), [offers]);
+  return (
+    <ResultsList
+      results={ranked}
+      label={label}
+      renderRow={(offer) => (
+        <FlightRow
+          directions={[{ offer }]}
+          price={offer.price}
+          currency={offer.currency}
+          deepLink={offer.deep_link}
+        />
+      )}
+    />
+  );
+}
+
+function RoundTripList({ offers }: { offers: RoundTripOffer[] }) {
+  const ranked = useMemo(() => offers.map(rankRoundTrip), [offers]);
+  return (
+    <ResultsList
+      results={ranked}
+      renderRow={(offer) => (
+        <FlightRow
+          directions={[
+            { label: "Outbound", offer: offer.outbound },
+            { label: "Return", offer: offer.return },
+          ]}
+          price={offer.price}
+          currency={offer.currency}
+          deepLink={offer.deep_link}
+        />
+      )}
+    />
+  );
+}
+
 function MultiCityTotal({ legs }: { legs: Leg[] }) {
   const picks = legs.map((leg) => cheapest(leg.offers));
   if (picks.some((p) => !p) || new Set(picks.map((p) => p!.currency)).size !== 1) {
@@ -54,7 +94,7 @@ function MultiCityTotal({ legs }: { legs: Leg[] }) {
   return (
     <p className="total">
       <strong>
-        Total: {total} {picks[0]!.currency}
+        Total: {formatPrice(total, picks[0]!.currency)}
       </strong>{" "}
       (cheapest option of each leg; price of two separate tickets)
     </p>
@@ -81,6 +121,8 @@ export default function App() {
 
   const [deals, setDeals] = useState<Deal[] | null>(null);
   const [dealsError, setDealsError] = useState<string | null>(null);
+
+  const [prefill, setPrefill] = useState<Prefill | null>(null);
 
   const resultsRef = useRef<HTMLElement>(null);
 
@@ -128,6 +170,28 @@ export default function App() {
     }
   }
 
+  // A deal's "See flights": fill the form, search live and scroll to the results.
+  // The deal's cached price is not reused: the search shows the current fares.
+  function handleSeeFlights(deal: Deal) {
+    if (!deal.origin) return;
+    setPrefill({
+      id: Date.now(),
+      origin: deal.origin,
+      destination: deal.destination,
+      date: deal.departure_date,
+    });
+    void handleSearch({
+      mode: "one-way",
+      origin: deal.origin,
+      destination: deal.destination,
+      date: deal.departure_date,
+      returnDate: "",
+      origin2: "",
+      destination2: "",
+      date2: "",
+    });
+  }
+
   const showResults = searching || searchError !== null || results !== null;
 
   return (
@@ -160,7 +224,7 @@ export default function App() {
 
         <section className="wrap search-section" id="search" aria-label="Flight search">
           <div className="search-card">
-            <SearchForm onSearch={handleSearch} disabled={searching} />
+            <SearchForm onSearch={handleSearch} disabled={searching} prefill={prefill} />
           </div>
         </section>
 
@@ -177,25 +241,14 @@ export default function App() {
                 (results.offers.length === 0 ? (
                   <p className="status">No flights found for this search.</p>
                 ) : (
-                  <ul className="offers">
-                    {results.offers.map((offer) => (
-                      <OneWayItem key={offer.offer_id} offer={offer} />
-                    ))}
-                  </ul>
+                  <OneWayList offers={results.offers} />
                 ))}
 
               {results?.kind === "round-trip" &&
                 (results.offers.length === 0 ? (
                   <p className="status">No flights found for this search.</p>
                 ) : (
-                  <ul className="offers">
-                    {results.offers.map((offer) => (
-                      <RoundTripItem
-                        key={`${offer.outbound.offer_id}-${offer.return.offer_id}`}
-                        offer={offer}
-                      />
-                    ))}
-                  </ul>
+                  <RoundTripList offers={results.offers} />
                 ))}
 
               {results?.kind === "multi-city" && (
@@ -212,11 +265,7 @@ export default function App() {
                         <p className="status">No flights found for this leg.</p>
                       )}
                       {leg.offers && leg.offers.length > 0 && (
-                        <ul className="offers">
-                          {leg.offers.map((offer) => (
-                            <OneWayItem key={offer.offer_id} offer={offer} />
-                          ))}
-                        </ul>
+                        <OneWayList offers={leg.offers} label={`Flights, leg ${i + 1}`} />
                       )}
                     </div>
                   ))}
@@ -235,7 +284,11 @@ export default function App() {
             {deals && (
               <ul className="offers deals-grid">
                 {deals.map((deal) => (
-                  <DealItem key={`${deal.destination}-${deal.departure_date}`} deal={deal} />
+                  <DealItem
+                    key={`${deal.destination}-${deal.departure_date}`}
+                    deal={deal}
+                    onSeeFlights={handleSeeFlights}
+                  />
                 ))}
               </ul>
             )}

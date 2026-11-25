@@ -14,7 +14,15 @@ import { airlineUrl } from "./airlines";
 import { resolveCode } from "./AirportInput";
 import { SearchForm } from "./SearchForm";
 import { DealItem } from "./DealItem";
-import { countryName, dayDifference, formatDuration, localTime, placeLabel } from "./format";
+import {
+  countryName,
+  dayDifference,
+  formatDuration,
+  formatPrice,
+  localTime,
+  minutesBetween,
+  placeLabel,
+} from "./format";
 import type { Deal, FlightOffer, Leg } from "./types";
 
 function offer(
@@ -62,6 +70,11 @@ function pickTrip(name: string) {
 
 function type(label: string, value: string) {
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
+}
+
+// The rows of a result list (the sort tabs also show prices, so scope to the list).
+function rows(name = "Flight results") {
+  return within(screen.getByRole("list", { name }));
 }
 
 afterEach(() => {
@@ -151,7 +164,7 @@ describe("multi-city", () => {
     );
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     // leg 1 still lists its offer
-    expect(screen.getByText(/150 USD/)).toBeTruthy();
+    expect(rows("Flights, leg 1").getByText("$150")).toBeTruthy();
     expect(screen.getByText(/Leg 1: TLV → ATH/)).toBeTruthy();
     expect(screen.getByText(/Leg 2: ATH → TLV/)).toBeTruthy();
     // no total while a leg is missing
@@ -175,7 +188,7 @@ describe("multi-city", () => {
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
 
     // cheapest of each leg: 90 + 70
-    await waitFor(() => expect(screen.getByText(/Total: 160 USD/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/Total: \$160/)).toBeTruthy());
     expect(screen.getByText(/price of two separate tickets/)).toBeTruthy();
   });
 });
@@ -207,8 +220,9 @@ describe("round trip", () => {
     type("Return", "2099-01-08");
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
 
-    await waitFor(() => expect(screen.getByText(/166 USD/)).toBeTruthy());
-    expect(screen.queryByText(/144 USD/)).toBeNull();
+    await waitFor(() => expect(rows().getByText("$166")).toBeTruthy());
+    expect(rows().getByText("round trip")).toBeTruthy();
+    expect(screen.queryByText("$144")).toBeNull();
   });
 });
 
@@ -220,7 +234,9 @@ describe("booking links", () => {
     type("Destination", "ath");
     type("Date", "2099-01-01");
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
-    await waitFor(() => expect(screen.getByText(/100 USD/)).toBeTruthy());
+    await waitFor(() => expect(rows().getByText("$100")).toBeTruthy());
+    // the links live in the expanded part of the row
+    fireEvent.click(rows().getByRole("button"));
   }
 
   it("books through the offer's deep link, and links the airline when it is mapped", async () => {
@@ -290,56 +306,32 @@ describe("formatting", () => {
   });
 });
 
+async function searchOne(offers: unknown[]) {
+  mockFetch([["origin=TLV", 200, { results: offers }]]);
+  render(<App />);
+  type("Origin", "tlv");
+  type("Destination", "fco");
+  type("Date", "2099-01-01");
+  fireEvent.click(screen.getByRole("button", { name: "Search" }));
+  await waitFor(() => expect(rows().getAllByRole("button").length).toBeGreaterThan(0));
+}
+
 describe("offer details", () => {
-  it("shows the route with city, country and airport, and the total duration", async () => {
-    mockFetch([
-      ["origin=TLV", 200, { results: [{ ...offer("a", 100, "El Al"), duration_minutes: 380, legs: [leg()] }] }],
-    ]);
-    render(<App />);
-    type("Origin", "tlv");
-    type("Destination", "fco");
-    type("Date", "2099-01-01");
-    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+  it("shows a compact line first and the timeline once the row is clicked", async () => {
+    await searchOne([{ ...offer("a", 100, "El Al"), duration_minutes: 380, legs: [leg()] }]);
 
-    await waitFor(() =>
-      expect(screen.getByText(/Tel Aviv, Israel \(TLV\)/)).toBeTruthy(),
-    );
-    expect(screen.getByText(/Rome, Italy \(FCO\)/)).toBeTruthy();
-    expect(screen.getByText(/Ben Gurion International Airport/)).toBeTruthy();
-    expect(screen.getByText(/Direct · 6h 20m/)).toBeTruthy();
-  });
+    // closed: airline, local times, duration, codes, nonstop, price and trip kind
+    expect(rows().getByText("El Al")).toBeTruthy();
+    expect(screen.getByText(/08:00 → 11:00/)).toBeTruthy();
+    expect(screen.getByText("6h 20m")).toBeTruthy();
+    expect(screen.getByText("Nonstop")).toBeTruthy();
+    expect(rows().getByText("one way")).toBeTruthy();
+    expect(screen.queryByText(/Ben Gurion International Airport/)).toBeNull();
 
-  it("lists each segment and the layover for flights with a stop", async () => {
-    const first = leg({
-      arrival_airport: "Frankfurt Airport",
-      arrival_airport_code: "FRA",
-      arrival_city: "Frankfurt",
-      arrival_country_code: "DE",
-      duration_minutes: 255,
-    });
-    const second = leg({
-      flight_number: "LH232",
-      departure_airport: "Frankfurt Airport",
-      departure_airport_code: "FRA",
-      departure_city: "Frankfurt",
-      departure_country_code: "DE",
-      duration_minutes: 125,
-    });
-    mockFetch([
-      ["origin=TLV", 200, { results: [{ ...offer("a", 100, "El Al"), stops: 1, duration_minutes: 500, legs: [first, second] }] }],
-    ]);
-    render(<App />);
-    type("Origin", "tlv");
-    type("Destination", "fco");
-    type("Date", "2099-01-01");
-    fireEvent.click(screen.getByRole("button", { name: "Search" }));
-
-    await waitFor(() => expect(screen.getByText(/LY381/)).toBeTruthy());
-    expect(screen.getByText(/LH232/)).toBeTruthy();
-    expect(screen.getByText(/4h 15m/)).toBeTruthy();
-    expect(screen.getByText(/2h 5m/)).toBeTruthy();
-    expect(screen.getByText("Layover in Frankfurt, Germany (FRA)")).toBeTruthy();
-    expect(screen.getByText(/1 stop · 8h 20m/)).toBeTruthy();
+    fireEvent.click(rows().getByRole("button"));
+    expect(screen.getByText(/Ben Gurion International Airport \(TLV\)/)).toBeTruthy();
+    expect(screen.getByText(/Fiumicino\) International Airport \(FCO\)/)).toBeTruthy();
+    expect(screen.getByText(/6h 20m · El Al LY381/)).toBeTruthy();
   });
 
   it("still renders an old offer whose legs lack the added fields", async () => {
@@ -347,14 +339,8 @@ describe("offer details", () => {
     for (const key of Object.keys(old).filter((k) => /code|city/.test(k))) {
       delete (old as unknown as Record<string, unknown>)[key];
     }
-    mockFetch([["origin=TLV", 200, { results: [{ ...offer("a", 100, "El Al"), legs: [old] }] }]]);
-    render(<App />);
-    type("Origin", "tlv");
-    type("Destination", "fco");
-    type("Date", "2099-01-01");
-    fireEvent.click(screen.getByRole("button", { name: "Search" }));
-
-    await waitFor(() => expect(screen.getByText(/100 USD/)).toBeTruthy());
+    await searchOne([{ ...offer("a", 100, "El Al"), legs: [old] }]);
+    fireEvent.click(rows().getByRole("button"));
     expect(screen.getByText(/Ben Gurion International Airport/)).toBeTruthy();
     expect(screen.getByText(/3h 20m/)).toBeTruthy();
   });
@@ -368,25 +354,27 @@ describe("deals", () => {
     currency: "USD",
     airline: "ITA Airways",
   };
+  const full: Deal = {
+    ...base,
+    origin: "TLV",
+    origin_city: "Tel Aviv",
+    origin_country_code: "IL",
+    origin_airport_name: "Ben Gurion International Airport",
+    destination_city: "Rome",
+    destination_country_code: "IT",
+    destination_airport_name: "Fiumicino",
+    total_duration_minutes: 260,
+  };
 
-  it("shows origin → destination with city, country and airport", () => {
+  it("shows city and country, the from price, and origin → destination", () => {
     render(
       <ul>
-        <DealItem
-          deal={{
-            ...base,
-            origin: "TLV",
-            origin_city: "Tel Aviv",
-            origin_country_code: "IL",
-            origin_airport_name: "Ben Gurion International Airport",
-            destination_city: "Rome",
-            destination_country_code: "IT",
-            destination_airport_name: "Fiumicino",
-            total_duration_minutes: 260,
-          }}
-        />
+        <DealItem deal={full} />
       </ul>,
     );
+    expect(screen.getByText("Rome, Italy")).toBeTruthy();
+    expect(screen.getByText("$120")).toBeTruthy();
+    expect(screen.getByText("from")).toBeTruthy();
     expect(screen.getByText(/Tel Aviv, Israel \(TLV\) → Rome, Italy \(FCO\)/)).toBeTruthy();
     expect(screen.getByText(/Ben Gurion International Airport → Fiumicino/)).toBeTruthy();
     expect(screen.getByText(/ITA Airways · 4h 20m/)).toBeTruthy();
@@ -395,11 +383,60 @@ describe("deals", () => {
   it("tolerates a deal cached without the added fields", () => {
     render(
       <ul>
-        <DealItem deal={base} />
+        <DealItem deal={base} onSeeFlights={() => {}} />
       </ul>,
     );
     expect(screen.getByText("FCO")).toBeTruthy();
-    expect(screen.getByText(/120 USD/)).toBeTruthy();
+    expect(screen.getByText("$120")).toBeTruthy();
+    // no origin to fill the form with: no button
+    expect(screen.queryByRole("button", { name: /See flights/ })).toBeNull();
+  });
+
+  it("uses the destination photo, lazy, with a descriptive alt, and has no booking link", () => {
+    render(
+      <ul>
+        <DealItem deal={full} onSeeFlights={() => {}} />
+      </ul>,
+    );
+    const img = screen.getByRole("img");
+    expect(img.getAttribute("src")).toBe("/destinations/FCO.webp");
+    expect(img.getAttribute("alt")).toBe("View of Rome, Italy");
+    expect(img.getAttribute("loading")).toBe("lazy");
+    expect(screen.queryByRole("link")).toBeNull();
+
+    // a missing photo leaves the gradient, without a broken image
+    fireEvent.error(img);
+    expect(screen.queryByRole("img")).toBeNull();
+  });
+
+  it("See flights fills the form as a one-way search and runs it live", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url.startsWith("/api/deals")) {
+          return Promise.resolve(new Response(JSON.stringify({ deals: [full] })));
+        }
+        if (url.startsWith("/api/flights")) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ results: [offer("a", 99, "ITA Airways")] })),
+          );
+        }
+        return Promise.resolve(new Response(JSON.stringify({ results: [] })));
+      }),
+    );
+    render(<App />);
+    pickTrip("Round trip");
+    fireEvent.click(await screen.findByRole("button", { name: "See flights to Rome, Italy" }));
+
+    await waitFor(() => expect(rows().getByText("$99")).toBeTruthy());
+    expect((screen.getByLabelText("Origin") as HTMLInputElement).value).toBe("TLV");
+    expect((screen.getByLabelText("Destination") as HTMLInputElement).value).toBe("FCO");
+    expect((screen.getByLabelText("Date") as HTMLInputElement).value).toBe("2099-02-01");
+    expect(screen.queryByLabelText("Return")).toBeNull();
+    const searched = (fetch as ReturnType<typeof vi.fn>).mock.calls
+      .map(([u]) => u as string)
+      .find((u) => u.startsWith("/api/flights"));
+    expect(searched).toBe("/api/flights?origin=TLV&destination=FCO&date=2099-02-01");
   });
 });
 
@@ -510,5 +547,24 @@ describe("local times", () => {
     expect(localTime("2099-01-01T23:15:00+01:00")).toBe("23:15");
     expect(localTime("2099-01-01T21:00:00Z")).toBe("21:00");
     expect(dayDifference("2027-03-27T18:00:00Z", "2027-03-29T09:40:00+08:00")).toBe(2);
+  });
+});
+
+describe("price formatting", () => {
+  it("formats with the currency the API sent, never a hardcoded one", () => {
+    expect(formatPrice(1234, "ILS")).toBe("₪1,234");
+    expect(formatPrice(1234.4, "USD")).toBe("$1,234");
+    expect(formatPrice(99, "EUR")).toBe("€99");
+    // a code Intl rejects must not crash the page
+    expect(formatPrice(50, "NOPE!")).toBe("50 NOPE!");
+  });
+});
+
+describe("layover time", () => {
+  it("uses the UTC offsets, not the local clocks", () => {
+    // lands 18:00 in Rome (+01:00), leaves 21:45 in Rome: 3h 45m
+    expect(minutesBetween("2099-01-01T18:00:00+01:00", "2099-01-01T21:45:00+01:00")).toBe(225);
+    // different offsets: 23:00-05:00 is 04:00Z, 06:30+02:00 is 04:30Z -> 30 minutes
+    expect(minutesBetween("2099-01-01T23:00:00-05:00", "2099-01-02T06:30:00+02:00")).toBe(30);
   });
 });

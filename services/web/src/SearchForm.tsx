@@ -1,11 +1,21 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { AirportInput, EMPTY_AIRPORT, resolveCode, type AirportValue } from "./AirportInput";
 import { SearchIcon, SwapIcon } from "./Icons";
 import type { SearchQuery, TripMode } from "./types";
 
+// A search chosen outside the form (a deal's "See flights"). `id` changes on
+// every request, so picking the same deal twice fills the form twice.
+export interface Prefill {
+  id: number;
+  origin: string;
+  destination: string;
+  date: string;
+}
+
 interface Props {
   onSearch: (query: SearchQuery) => void;
   disabled: boolean;
+  prefill?: Prefill | null;
 }
 
 const MODES: { value: TripMode; label: string }[] = [
@@ -14,7 +24,7 @@ const MODES: { value: TripMode; label: string }[] = [
   { value: "multi-city", label: "Multi-city" },
 ];
 
-export function SearchForm({ onSearch, disabled }: Props) {
+export function SearchForm({ onSearch, disabled, prefill }: Props) {
   const [mode, setMode] = useState<TripMode>("one-way");
   const [origin, setOrigin] = useState<AirportValue>(EMPTY_AIRPORT);
   const [destination, setDestination] = useState<AirportValue>(EMPTY_AIRPORT);
@@ -24,6 +34,15 @@ export function SearchForm({ onSearch, disabled }: Props) {
   const [destination2, setDestination2] = useState<AirportValue>(EMPTY_AIRPORT);
   const [date2, setDate2] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!prefill) return;
+    setMode("one-way");
+    setOrigin({ text: prefill.origin, code: prefill.origin });
+    setDestination({ text: prefill.destination, code: prefill.destination });
+    setDate(prefill.date);
+    setFormError(null);
+  }, [prefill]);
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
