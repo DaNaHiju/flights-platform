@@ -31,8 +31,11 @@ export function DealItem({ deal }: { deal: Deal }) {
           {" "}
           {[fromSecondary, toSecondary].filter(Boolean).join(" → ")}
         </small>
-      )}{" "}
-      · {deal.departure_date} · {deal.price} {deal.currency} ·{" "}
+      )}
+      <span className="deal-price">
+        {deal.price} {deal.currency}
+      </span>
+      {deal.departure_date} ·{" "}
       {deal.airline}
       {deal.total_duration_minutes ? ` · ${formatDuration(deal.total_duration_minutes)}` : ""}
     </li>

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError, listDeals, searchFlights, searchRoundTrip } from "./api";
 import { DealItem } from "./DealItem";
 import { displayCode } from "./format";
+import { PlaneIcon } from "./Icons";
 import { OneWayItem, RoundTripItem } from "./OfferItem";
 import { SearchForm } from "./SearchForm";
 import type { Deal, FlightOffer, RoundTripOffer, SearchQuery } from "./types";
@@ -51,12 +52,25 @@ function MultiCityTotal({ legs }: { legs: Leg[] }) {
   }
   const total = picks.reduce((sum, p) => sum + p!.price, 0);
   return (
-    <p>
+    <p className="total">
       <strong>
         Total: {total} {picks[0]!.currency}
       </strong>{" "}
       (cheapest option of each leg; price of two separate tickets)
     </p>
+  );
+}
+
+function Brand({ footer = false }: { footer?: boolean }) {
+  return (
+    <a className="brand" href="#top" aria-label="brisa, back to the top">
+      {!footer && (
+        <span className="brand-mark">
+          <PlaneIcon />
+        </span>
+      )}
+      brisa<span className="brand-dot">.</span>
+    </a>
   );
 }
 
@@ -68,11 +82,21 @@ export default function App() {
   const [deals, setDeals] = useState<Deal[] | null>(null);
   const [dealsError, setDealsError] = useState<string | null>(null);
 
+  const resultsRef = useRef<HTMLElement>(null);
+
   useEffect(() => {
     listDeals()
       .then(setDeals)
       .catch((err) => setDealsError(errorText(err)));
   }, []);
+
+  // Bring the results into view once a search finishes. Optional call: jsdom
+  // (the tests) does not implement scrollIntoView.
+  useEffect(() => {
+    if (results || searchError) {
+      resultsRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    }
+  }, [results, searchError]);
 
   async function handleSearch(query: SearchQuery) {
     setSearching(true);
@@ -104,77 +128,132 @@ export default function App() {
     }
   }
 
+  const showResults = searching || searchError !== null || results !== null;
+
   return (
-    <main>
-      <h1>Flights</h1>
+    <>
+      <header className="site-header" id="top">
+        <div className="wrap nav-inner">
+          <Brand />
+          <nav className="nav-links" aria-label="Main navigation">
+            <a href="#top">Home</a>
+            <a href="#deals">Deals</a>
+            <a className="nav-pill" href="#search">
+              Find flights
+            </a>
+          </nav>
+        </div>
+      </header>
 
-      <section>
-        <h2>Search flights</h2>
-        <SearchForm onSearch={handleSearch} disabled={searching} />
-        {searching && <p>Searching…</p>}
-        {searchError && <p role="alert">{searchError}</p>}
+      <main>
+        <section className="hero" aria-labelledby="hero-title">
+          <div className="wrap hero-content">
+            <span className="eyebrow">The world is waiting</span>
+            <h1 id="hero-title">
+              Fly into your
+              <br />
+              next story.
+            </h1>
+            <p>Spontaneous escapes, dream trips, and unforgettable moments. Start exploring your next destination.</p>
+          </div>
+        </section>
 
-        {results?.kind === "one-way" &&
-          (results.offers.length === 0 ? (
-            <p>No flights found for this search.</p>
-          ) : (
-            <ul className="offers">
-              {results.offers.map((offer) => (
-                <OneWayItem key={offer.offer_id} offer={offer} />
-              ))}
-            </ul>
-          ))}
+        <section className="wrap search-section" id="search" aria-label="Flight search">
+          <div className="search-card">
+            <SearchForm onSearch={handleSearch} disabled={searching} />
+          </div>
+        </section>
 
-        {results?.kind === "round-trip" &&
-          (results.offers.length === 0 ? (
-            <p>No flights found for this search.</p>
-          ) : (
-            <ul className="offers">
-              {results.offers.map((offer) => (
-                <RoundTripItem
-                  key={`${offer.outbound.offer_id}-${offer.return.offer_id}`}
-                  offer={offer}
-                />
-              ))}
-            </ul>
-          ))}
+        {showResults && (
+          <section className="section-block results" id="results" ref={resultsRef}>
+            <div className="wrap">
+              <p className="section-kicker">Your search</p>
+              <h2>Flights</h2>
 
-        {results?.kind === "multi-city" && (
-          <>
-            <MultiCityTotal legs={results.legs} />
-            {results.legs.map((leg, i) => (
-              <div key={i}>
-                <h3>
-                  Leg {i + 1}: {displayCode(leg.origin)} → {displayCode(leg.destination)} ·{" "}
-                  {leg.date}
-                </h3>
-                {leg.error && <p role="alert">{leg.error}</p>}
-                {leg.offers?.length === 0 && <p>No flights found for this leg.</p>}
-                {leg.offers && leg.offers.length > 0 && (
+              {searching && <p className="status">Searching…</p>}
+              {searchError && <p role="alert">{searchError}</p>}
+
+              {results?.kind === "one-way" &&
+                (results.offers.length === 0 ? (
+                  <p className="status">No flights found for this search.</p>
+                ) : (
                   <ul className="offers">
-                    {leg.offers.map((offer) => (
+                    {results.offers.map((offer) => (
                       <OneWayItem key={offer.offer_id} offer={offer} />
                     ))}
                   </ul>
-                )}
-              </div>
-            ))}
-          </>
-        )}
-      </section>
+                ))}
 
-      <section>
-        <h2>Deals</h2>
-        {dealsError && <p>{dealsError}</p>}
-        {!deals && !dealsError && <p>Loading…</p>}
-        {deals && (
-          <ul className="offers">
-            {deals.map((deal) => (
-              <DealItem key={`${deal.destination}-${deal.departure_date}`} deal={deal} />
-            ))}
-          </ul>
+              {results?.kind === "round-trip" &&
+                (results.offers.length === 0 ? (
+                  <p className="status">No flights found for this search.</p>
+                ) : (
+                  <ul className="offers">
+                    {results.offers.map((offer) => (
+                      <RoundTripItem
+                        key={`${offer.outbound.offer_id}-${offer.return.offer_id}`}
+                        offer={offer}
+                      />
+                    ))}
+                  </ul>
+                ))}
+
+              {results?.kind === "multi-city" && (
+                <>
+                  <MultiCityTotal legs={results.legs} />
+                  {results.legs.map((leg, i) => (
+                    <div key={i}>
+                      <h3 className="leg-title">
+                        Leg {i + 1}: {displayCode(leg.origin)} → {displayCode(leg.destination)} ·{" "}
+                        {leg.date}
+                      </h3>
+                      {leg.error && <p role="alert">{leg.error}</p>}
+                      {leg.offers?.length === 0 && (
+                        <p className="status">No flights found for this leg.</p>
+                      )}
+                      {leg.offers && leg.offers.length > 0 && (
+                        <ul className="offers">
+                          {leg.offers.map((offer) => (
+                            <OneWayItem key={offer.offer_id} offer={offer} />
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </section>
         )}
-      </section>
-    </main>
+
+        <section className="section-block" id="deals">
+          <div className="wrap">
+            <p className="section-kicker">A little inspiration</p>
+            <h2>Deals</h2>
+            {dealsError && <p className="status">{dealsError}</p>}
+            {!deals && !dealsError && <p className="status">Loading…</p>}
+            {deals && (
+              <ul className="offers deals-grid">
+                {deals.map((deal) => (
+                  <DealItem key={`${deal.destination}-${deal.departure_date}`} deal={deal} />
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+      </main>
+
+      <footer className="site-footer">
+        <div className="wrap footer-inner">
+          <div>
+            <Brand footer />
+            <p>Fares and schedules come from the flight provider and can change before you book.</p>
+          </div>
+          <a className="footer-link" href="#top">
+            Back to top ↑
+          </a>
+        </div>
+      </footer>
+    </>
   );
 }
