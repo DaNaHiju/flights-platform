@@ -16,10 +16,14 @@ from sqlalchemy.orm import sessionmaker
 SQLALCHEMY_TEST_URL = "sqlite:///./test.db"
 os.environ["DATABASE_URL"] = SQLALCHEMY_TEST_URL
 os.environ["REDIS_URL"] = "redis://redis.invalid:6379/0"
+# Removed so no test can ever reach the real Amadeus gateway, even when a
+# developer has a real key exported in their shell.
+os.environ.pop("AMADEUS_API_KEY", None)
 
 from shared import cache  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
+from shared.providers import get_provider  # noqa: E402
 
 engine = create_engine(SQLALCHEMY_TEST_URL, connect_args={"check_same_thread": False})
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -56,7 +60,9 @@ class FakeRedis:
 @pytest.fixture(autouse=True)
 def fake_redis(monkeypatch):
     """Replace the Redis client with an in-memory fake for every test."""
-    monkeypatch.setattr(cache, "redis_client", FakeRedis())
+    fake = FakeRedis()
+    monkeypatch.setattr(cache, "redis_client", fake)
+    return fake
 
 
 @pytest.fixture(autouse=True)
@@ -71,3 +77,15 @@ def setup_database():
 def client():
     """Return a synchronous test client."""
     return TestClient(app)
+
+
+@pytest.fixture
+def use_provider():
+    """Swap the flight provider the API uses: use_provider(some_provider)."""
+
+    def _use(provider):
+        app.dependency_overrides[get_provider] = lambda: provider
+        return provider
+
+    yield _use
+    app.dependency_overrides.pop(get_provider, None)

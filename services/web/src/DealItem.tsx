@@ -1,4 +1,3 @@
-import { airlineDisplayName } from "./airlines";
 import { formatDuration, placeLabel, secondaryAirport, type Place } from "./format";
 import type { Deal } from "./types";
 
@@ -34,7 +33,7 @@ export function DealItem({ deal }: { deal: Deal }) {
         </small>
       )}{" "}
       · {deal.departure_date} · {deal.price} {deal.currency} ·{" "}
-      {airlineDisplayName(deal.airline)}
+      {deal.airline}
       {deal.total_duration_minutes ? ` · ${formatDuration(deal.total_duration_minutes)}` : ""}
     </li>
   );

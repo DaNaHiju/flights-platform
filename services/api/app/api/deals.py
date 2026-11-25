@@ -1,6 +1,6 @@
 """Top deals API router.
 
-Always served from Redis. This router never calls fli directly — the
+Always served from Redis. This router never calls the flight provider — the
 deals:top cache is populated out-of-band by the worker service (see
 services/worker/worker/refresh_deals.py), invoked on a schedule by a CronJob
 defined in the manifests repo.

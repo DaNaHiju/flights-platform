@@ -1,4 +1,4 @@
-import type { Deal, FlightOffer, RoundTripOffer } from "./types";
+import type { Deal, FlightOffer, Location, RoundTripOffer } from "./types";
 
 // Same origin: nginx (or the vite dev server) forwards /api/* to flights-api.
 const BASE = "/api";
@@ -7,7 +7,11 @@ export const PROVIDER_DOWN_MESSAGE =
   "The flight provider is not responding right now. Please try again in a few minutes.";
 
 const ERROR_MESSAGES: Record<string, string> = {
-  invalid_iata_code: "Invalid airport code. Use 3 letters, for example EZE.",
+  invalid_iata_code: "Pick an airport or city from the list, or type a 3-letter code.",
+  same_origin_and_destination: "Origin and destination must be different.",
+  invalid_search: "The flight provider rejected this search. Check the airports and dates.",
+  provider_rate_limited: "Too many searches right now. Please wait a minute and try again.",
+  provider_not_configured: "Flight search is not configured on this server yet.",
   invalid_date_format: "The date format is not valid.",
   date_in_past: "The date must be today or later.",
   return_before_departure: "The return cannot be before the departure.",
@@ -16,10 +20,10 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 export class ApiError extends Error {}
 
-async function get<T>(path: string): Promise<T> {
+async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`${BASE}${path}`);
+    res = await fetch(`${BASE}${path}`, signal ? { signal } : undefined);
   } catch {
     throw new ApiError("Could not connect to the server.");
   }
@@ -67,4 +71,14 @@ export async function searchRoundTrip(
 export async function listDeals(): Promise<Deal[]> {
   const data = await get<{ deals: Deal[] }>("/deals");
   return data.deals;
+}
+
+// Typeahead: airports and cities matching what the user typed.
+export async function searchLocations(
+  keyword: string,
+  signal?: AbortSignal,
+): Promise<Location[]> {
+  const query = new URLSearchParams({ keyword });
+  const data = await get<{ results: Location[] }>(`/locations?${query}`, signal);
+  return data.results;
 }

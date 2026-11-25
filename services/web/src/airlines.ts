@@ -1,13 +1,10 @@
-// Airline website by IATA code, for the most common airlines on routes from TLV.
+// Airline websites by IATA code, for the most common airlines on routes from TLV.
 //
-// `name` is the exact airline name flights-api sends (it comes from fli's airline
-// table). The API sends names, not IATA codes, so lookups go through the name.
-// A few fli names look odd: LH is "Lufthansa Cargo" and AZ is "Alitalia" (now ITA
-// Airways). `name` keeps them as fli spells them, because that is what arrives
-// and what the lookup matches; `displayName` is what the UI shows instead.
+// flights-api sends each flight's airline code (Leg.airline_code) next to its
+// resolved name, so lookups go by code. This map only adds a "Go to <airline>"
+// link; booking itself goes through the offer's deep_link.
 interface Airline {
   name: string;
-  displayName?: string;
   url: string;
 }
 
@@ -15,7 +12,7 @@ export const AIRLINES: Record<string, Airline> = {
   LY: { name: "El Al", url: "https://www.elal.com" },
   "6H": { name: "Israir Airlines", url: "https://www.israir.co.il" },
   IZ: { name: "Arkia", url: "https://www.arkia.com" },
-  LH: { name: "Lufthansa Cargo", displayName: "Lufthansa", url: "https://www.lufthansa.com" },
+  LH: { name: "Lufthansa", url: "https://www.lufthansa.com" },
   OS: { name: "Austrian Airlines", url: "https://www.austrian.com" },
   LX: { name: "Swiss International Air Lines", url: "https://www.swiss.com" },
   TK: { name: "Turkish Airlines", url: "https://www.turkishairlines.com" },
@@ -38,7 +35,7 @@ export const AIRLINES: Record<string, Airline> = {
   UA: { name: "United Airlines", url: "https://www.united.com" },
   DL: { name: "Delta Air Lines", url: "https://www.delta.com" },
   AA: { name: "American Airlines", url: "https://www.aa.com" },
-  AZ: { name: "Alitalia", displayName: "ITA Airways", url: "https://www.ita-airways.com" },
+  AZ: { name: "ITA Airways", url: "https://www.ita-airways.com" },
   LO: { name: "LOT Polish Airlines", url: "https://www.lot.com" },
   OK: { name: "Czech Airlines", url: "https://www.csa.cz" },
   TP: { name: "TAP Portugal", url: "https://www.flytap.com" },
@@ -48,20 +45,7 @@ export const AIRLINES: Record<string, Airline> = {
   ET: { name: "Ethiopian Airlines", url: "https://www.ethiopianairlines.com" },
 };
 
-const DISPLAY_NAME_BY_NAME = new Map(
-  Object.values(AIRLINES).map((airline) => [airline.name, airline.displayName ?? airline.name]),
-);
-
-/** Name to show for an airline name as fli sends it (corrects the odd ones). */
-export function airlineDisplayName(name: string): string {
-  return DISPLAY_NAME_BY_NAME.get(name) ?? name;
-}
-
-const URL_BY_NAME = new Map(
-  Object.values(AIRLINES).map((airline) => [airline.name, airline.url]),
-);
-
-/** Website of the airline with this name, or undefined when it is not in the map. */
-export function airlineUrl(name: string): string | undefined {
-  return URL_BY_NAME.get(name);
+/** Website of the airline with this IATA code, or undefined when it is not in the map. */
+export function airlineUrl(code: string | null | undefined): string | undefined {
+  return code ? AIRLINES[code.toUpperCase()]?.url : undefined;
 }

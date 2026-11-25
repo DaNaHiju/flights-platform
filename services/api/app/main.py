@@ -9,7 +9,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api import bookings, deals, flights
+from app.api import bookings, deals, flights, locations
 from app.config import settings
 from app.database import create_tables, get_db
 from app.utils.metrics import request_count, request_duration
@@ -33,7 +33,7 @@ async def lifespan(application: FastAPI):
 
 app = FastAPI(
     title="Flights API",
-    description="FastAPI booking service backed by fli (reverse-engineered Google Flights).",
+    description="Flight search and booking service backed by the Amadeus Travel Builder APIs.",
     version=settings.APP_VERSION,
     lifespan=lifespan,
 )
@@ -49,7 +49,8 @@ app = FastAPI(
 async def flat_http_exception_handler(request: Request, exc: HTTPException):
     """Unwrap dict `detail` payloads so error bodies match docs/api-contract.md."""
     content = exc.detail if isinstance(exc.detail, dict) else {"error": exc.detail}
-    return JSONResponse(status_code=exc.status_code, content=content)
+    # Headers are kept: a rate-limited answer carries Retry-After.
+    return JSONResponse(status_code=exc.status_code, content=content, headers=exc.headers)
 
 
 # ---------------------------------------------------------------------------
@@ -121,5 +122,6 @@ def metrics():
 # ---------------------------------------------------------------------------
 
 app.include_router(flights.router, prefix="/flights", tags=["flights"])
+app.include_router(locations.router, prefix="/locations", tags=["locations"])
 app.include_router(deals.router, prefix="/deals", tags=["deals"])
 app.include_router(bookings.router, prefix="/bookings", tags=["bookings"])

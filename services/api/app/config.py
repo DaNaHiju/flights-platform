@@ -20,8 +20,8 @@ class Settings(SharedSettings):
     PORT: int = int(os.getenv("PORT", "8000"))
 
     SEARCH_CACHE_TTL: int = int(os.getenv("SEARCH_CACHE_TTL", "600"))
-    # Assumed validity window of a fli booking_token before Google expires it.
-    # Unverified — see docs/api-contract.md open questions.
+    # How long a searched offer stays bookable through POST /bookings. Prices are
+    # live, so this is kept short; after it the user has to search again.
     OFFER_CACHE_TTL: int = int(os.getenv("OFFER_CACHE_TTL", "600"))
 
 

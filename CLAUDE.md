@@ -10,7 +10,8 @@ Every line must be explainable out loud in a review call. Prefer clarity over cl
 
 ## Stack
 - Python 3.12, FastAPI
-- `fli` library (reverse-engineers Google Flights) — no official API key
+- Flight data: Amadeus Travel Builder APIs behind `shared/providers` (FlightProvider).
+  API key `AMADEUS_API_KEY` from an ExternalSecret at runtime; never in code, image or Git.
 - Docker multi-stage build, non-root runtime user
 - Optional deps: PostgreSQL, Redis (conditional Helm subcharts, not always enabled)
 

@@ -1,6 +1,7 @@
 """Worker settings: the shared settings plus what only the worker needs.
 
-No DATABASE_URL here on purpose — the worker only reads fli and writes Redis.
+No DATABASE_URL here on purpose — the worker only calls the flight provider
+and writes Redis.
 There is no refresh interval either: each run refreshes once and exits; how
 often it runs is the CronJob's schedule (manifests repo).
 """
