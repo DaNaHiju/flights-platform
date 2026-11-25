@@ -63,3 +63,29 @@ export function dayDifference(fromIso: string, toIso: string): number {
 export function displayCode(code: string): string {
   return code.replace(/\+$/, "");
 }
+
+/**
+ * 1234 + "ILS" -> "₪1,234". The currency is whatever the API sent: nothing is
+ * hardcoded here. Whole units only, like the fare listings people compare it to.
+ * A code Intl does not know falls back to "1234 XYZ" instead of crashing.
+ */
+export function formatPrice(amount: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat("en", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `${Math.round(amount)} ${currency}`;
+  }
+}
+
+/**
+ * Minutes between two timestamps that carry their UTC offsets, e.g. the arrival
+ * at a layover airport and the next departure. Date.parse honours the offsets, so
+ * the result is the real elapsed time, not a difference of local clocks.
+ */
+export function minutesBetween(fromIso: string, toIso: string): number {
+  return Math.round((Date.parse(toIso) - Date.parse(fromIso)) / 60_000);
+}
