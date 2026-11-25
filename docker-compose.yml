@@ -36,6 +36,9 @@ services:
     environment:
       DATABASE_URL: postgresql://user:password@postgres:5432/flights
       REDIS_URL: redis://redis:6379/0
+      # Taken from your shell (never written in this file). Empty: searches
+      # answer 503 provider_not_configured, everything else works.
+      AMADEUS_API_KEY: ${AMADEUS_API_KEY:-}
       FLIGHTS_CURRENCY: USD
       FLIGHTS_DEFAULT_ORIGIN: TLV
       LOG_LEVEL: INFO
@@ -55,6 +58,7 @@ services:
       dockerfile: services/worker/Dockerfile
     environment:
       REDIS_URL: redis://redis:6379/0
+      AMADEUS_API_KEY: ${AMADEUS_API_KEY:-}
       FLIGHTS_CURRENCY: USD
       FLIGHTS_DEFAULT_ORIGIN: TLV
       LOG_LEVEL: INFO
@@ -62,7 +66,7 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    # "no": a restart loop would hammer Google Flights through fli.
+    # "no": a restart loop would burn the Amadeus API quota.
     restart: "no"
 
 volumes:
