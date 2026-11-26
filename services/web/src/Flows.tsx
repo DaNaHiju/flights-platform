@@ -11,6 +11,10 @@ import {
 import { ResultsList } from "./ResultsList";
 import type { FlightOffer, RoundTripOffer } from "./types";
 
+// Shown when a search (or one leg of a multi-city search) comes back empty.
+export const NO_FLIGHTS_MESSAGE =
+  "No airline in our network flies this route on this date. Try the city instead of a single airport, or another date.";
+
 // ── Steps ────────────────────────────────────────────────────────────────────
 // Every trip type is a list of steps ending in a review. `picks[i]` is what was
 // chosen at step i; going back to step i forgets that choice and the later ones.
@@ -255,7 +259,7 @@ function LegStep({
         Leg {index + 1}: {displayCode(leg.origin)} → {displayCode(leg.destination)} · {leg.date}
       </h3>
       {leg.error && <p role="alert">{leg.error}</p>}
-      {leg.offers?.length === 0 && <p className="status">No flights found for this leg.</p>}
+      {leg.offers?.length === 0 && <p className="status">{NO_FLIGHTS_MESSAGE}</p>}
       <ResultsList
         label={`Flights, leg ${index + 1}`}
         results={ranked}

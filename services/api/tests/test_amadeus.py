@@ -17,6 +17,7 @@ from shared.providers.amadeus import (
     normalize_keyword,
 )
 from shared.schemas import FlightOffer
+from shared.utils.logging import log as amadeus_log
 from tests.amadeus_fixtures import (
     AIRLINES,
     AIRLINES_RESPONSE,
@@ -180,6 +181,26 @@ def test_display_name():
     assert display_name("KLM ROYAL DUTCH AIRLINES") == "KLM Royal Dutch Airlines"
 
 
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        ("ITA AIRWAYS", "ITA Airways"),
+        ("TAP AIR PORTUGAL", "TAP Air Portugal"),
+        ("LOT POLISH AIRLINES", "LOT Polish Airlines"),
+        ("SAS SCANDINAVIAN AIRLINES", "SAS Scandinavian Airlines"),
+        ("ALL NIPPON AIRWAYS", "All Nippon Airways"),
+        ("ANA", "ANA"),
+        ("JAL", "JAL"),
+        ("Ita Airways", "ITA Airways"),
+        # not an acronym: a word that merely starts like one
+        ("SASKATOON", "Saskatoon"),
+        ("TAPA AIR", "Tapa Air"),
+    ],
+)
+def test_display_name_keeps_known_airline_acronyms(raw, expected):
+    assert display_name(raw) == expected
+
+
 # --- error handling --------------------------------------------------------------
 
 
@@ -219,6 +240,25 @@ def test_search_wide_rate_limit_code_in_errors_raises_rate_limited():
 def test_no_offers_from_any_merchant_is_an_empty_result():
     gw = FakeGateway().on(SEARCH, {"results": [], "errors": {"LY": "120 - No flight found"}})
     assert gw.provider().search_one_way("TLV", "MAD", "2099-01-01", 1, "USD") == []
+
+
+def test_merchants_without_offers_are_logged_with_route_and_date(caplog):
+    gw = FakeGateway().on(
+        SEARCH, {"results": [], "errors": {"LY": "120 - none", "UX": "120 - none"}}
+    )
+    with caplog.at_level("INFO", logger=amadeus_log.name):
+        gw.provider().search_one_way("TLV", "MAD", "2099-01-01", 1, "USD")
+    messages = [r.getMessage() for r in caplog.records]
+    assert "Amadeus: 2 merchant(s) returned no offers for TLV->MAD on 2099-01-01" in messages
+
+
+def test_round_trip_log_names_both_routes_and_dates(caplog):
+    gw = FakeGateway().on(SEARCH, {"results": [], "errors": {"LY": "120 - none"}})
+    with caplog.at_level("INFO", logger=amadeus_log.name):
+        gw.provider().search_round_trip("TLV", "MAD", "2099-01-01", "2099-01-08", 1, "USD")
+    assert any(
+        "TLV->MAD on 2099-01-01, MAD->TLV on 2099-01-08" in r.getMessage() for r in caplog.records
+    )
 
 
 def test_server_error_is_retried_once():

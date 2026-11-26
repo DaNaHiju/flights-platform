@@ -160,12 +160,38 @@ def test_second_identical_search_is_served_from_cache(client, use_provider):
     assert len(stub.calls) == 1
 
 
-def test_empty_result_is_cached_too(client, use_provider):
+def test_empty_result_is_not_cached(client, use_provider, fake_redis):
+    # Failing merchants look like "no offers": remembering it would keep saying
+    # "no flights" after the provider recovers.
     stub = use_provider(StubProvider(offers=[]))
     client.get("/flights/", params=PARAMS)
     second = client.get("/flights/", params=PARAMS)
-    assert second.json() == {"results": [], "cached": True, "cached_at": second.json()["cached_at"]}
-    assert len(stub.calls) == 1
+    assert second.json() == {"results": [], "cached": False, "cached_at": None}
+    assert len(stub.calls) == 2
+    assert not [key for key in fake_redis.store if key.startswith("search:")]
+
+
+class EmptyRoundTripProvider(StubProvider):
+    def search_round_trip(self, *args):
+        self.calls.append(("round_trip", *args))
+        return []
+
+
+def test_empty_round_trip_is_not_cached_either(client, use_provider):
+    stub = use_provider(EmptyRoundTripProvider())
+    client.get("/flights/", params=RT_PARAMS)
+    second = client.get("/flights/", params=RT_PARAMS)
+    assert second.json()["cached"] is False
+    assert len(stub.calls) == 2
+
+
+def test_a_search_that_recovers_is_cached_from_then_on(client, use_provider):
+    stub = use_provider(StubProvider(offers=[]))
+    client.get("/flights/", params=PARAMS)
+    stub.offers = [make_offer()]
+    assert client.get("/flights/", params=PARAMS).json()["cached"] is False
+    assert client.get("/flights/", params=PARAMS).json()["cached"] is True
+    assert len(stub.calls) == 2
 
 
 def test_round_trip_has_its_own_cache_key_and_shape(client, use_provider):

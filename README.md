@@ -175,7 +175,7 @@ cached long; prices are live and are cached briefly.
 Also part of the strategy:
 
 - The typeahead is debounced (250 ms) and skips keywords under 2 characters.
-- Errors are never cached; empty results are.
+- Errors and empty results are never cached: a merchant that failed looks like "no offers", and caching that would keep answering "no flights" after the provider recovers.
 - Redis being down makes searches slower (cache misses), not failing.
 - Retries are bounded: one retry after a 5xx, one inline wait after a 429 only
   if `Retry-After` ≤ 2 s; timeouts are not retried. Otherwise the client gets

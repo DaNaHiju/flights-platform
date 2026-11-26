@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ApiError, listDeals, searchFlights, searchRoundTrip } from "./api";
 import { DealItem } from "./DealItem";
 import { PlaneIcon } from "./Icons";
-import { MultiCityFlow, OneWayFlow, RoundTripFlow, type LegSearch } from "./Flows";
+import { MultiCityFlow, NO_FLIGHTS_MESSAGE, OneWayFlow, RoundTripFlow, type LegSearch } from "./Flows";
 import { SearchForm, type Prefill } from "./SearchForm";
 import type { Deal, FlightOffer, RoundTripOffer, SearchQuery } from "./types";
 
@@ -180,14 +180,14 @@ export default function App() {
 
               {results?.kind === "one-way" &&
                 (results.offers.length === 0 ? (
-                  <p className="status">No flights found for this search.</p>
+                  <p className="status">{NO_FLIGHTS_MESSAGE}</p>
                 ) : (
                   <OneWayFlow offers={results.offers} adults={results.query.adults} />
                 ))}
 
               {results?.kind === "round-trip" &&
                 (results.offers.length === 0 ? (
-                  <p className="status">No flights found for this search.</p>
+                  <p className="status">{NO_FLIGHTS_MESSAGE}</p>
                 ) : (
                   <RoundTripFlow offers={results.offers} adults={results.query.adults} />
                 ))}

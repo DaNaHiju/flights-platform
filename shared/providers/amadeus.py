@@ -247,13 +247,23 @@ def _checked_bags(bound: dict) -> list[CheckedBag] | None:
 
 
 _SHORT_UPPER = re.compile(r"^[^AEIOUY]{1,3}$")
+# Airline names that are acronyms but contain a vowel, so the consonant rule
+# above would turn them into "Ita" or "Sas". Kept short on purpose: add a name
+# here when an airline shows up wrongly capitalised.
+_KNOWN_ACRONYMS = frozenset({"ITA", "TAP", "LOT", "SAS", "KLM", "ANA", "JAL"})
+
+
+def _display_word(word: str) -> str:
+    if word.upper() in _KNOWN_ACRONYMS:
+        return word.upper()
+    if _SHORT_UPPER.match(word):
+        return word  # consonant-only, such as "KLM": already an acronym
+    return word.capitalize()
 
 
 def display_name(value: str) -> str:
-    """"BRITISH AIRWAYS" -> "British Airways"; consonant-only acronyms ("KLM") stay."""
-    return " ".join(
-        word if _SHORT_UPPER.match(word) else word.capitalize() for word in value.split()
-    )
+    """"BRITISH AIRWAYS" -> "British Airways"; acronyms ("KLM", "ITA") stay upper case."""
+    return " ".join(_display_word(word) for word in value.split())
 
 
 _TRANSLITERATE = str.maketrans(
@@ -358,7 +368,10 @@ class AmadeusProvider:
         if not results and str(errors.get("*", "")).startswith(MERCHANT_RATE_LIMIT_CODES):
             raise ProviderRateLimitedError("Amadeus search-wide rate limit")
         if errors:
-            log.info("Amadeus: %d merchant(s) returned no offers", len(errors))
+            route = ", ".join(
+                f"{o}->{d} on {day}" for o, d, day in zip(origins, destinations, dates)
+            )
+            log.info("Amadeus: %d merchant(s) returned no offers for %s", len(errors), route)
         return [r for r in results if self._total_price(r) is not None]
 
     @staticmethod

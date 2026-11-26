@@ -108,15 +108,20 @@ def search_flights(
         ) from exc
 
     offers = [m.model_dump(mode="json", by_alias=True) for m in models]
-    now = datetime.now(timezone.utc).isoformat()
-    try_set_json(
-        cache_key, {"cached_at": now, "offers": offers}, ttl=settings.SEARCH_CACHE_TTL
-    )
 
-    if not return_date:
-        # Each one-way offer is also cached on its own, so POST /bookings can
-        # look it up by offer_id independently of the search cache's TTL.
-        for offer in offers:
-            try_set_json(f"offer:{offer['offer_id']}", offer, ttl=settings.OFFER_CACHE_TTL)
+    # An empty answer is NOT cached. Merchants that fail or rate-limit show up as
+    # "no offers" too, so remembering it would keep answering "no flights" for
+    # SEARCH_CACHE_TTL after the provider has recovered. Searching again is cheap.
+    if offers:
+        now = datetime.now(timezone.utc).isoformat()
+        try_set_json(
+            cache_key, {"cached_at": now, "offers": offers}, ttl=settings.SEARCH_CACHE_TTL
+        )
+
+        if not return_date:
+            # Each one-way offer is also cached on its own, so POST /bookings can
+            # look it up by offer_id independently of the search cache's TTL.
+            for offer in offers:
+                try_set_json(f"offer:{offer['offer_id']}", offer, ttl=settings.OFFER_CACHE_TTL)
 
     return {"results": offers, "cached": False, "cached_at": None}

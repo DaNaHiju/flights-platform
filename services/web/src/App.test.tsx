@@ -876,3 +876,108 @@ describe("layover time", () => {
     expect(minutesBetween("2099-01-01T23:00:00-05:00", "2099-01-02T06:30:00+02:00")).toBe(30);
   });
 });
+
+// ── Small fixes ──────────────────────────────────────────────────────────────
+
+const NO_FLIGHTS =
+  "No airline in our network flies this route on this date. Try the city instead of a single airport, or another date.";
+
+describe("no results", () => {
+  it("one way says no airline flies the route and suggests the city or another date", async () => {
+    mockFetch([["origin=TLV", 200, { results: [] }]]);
+    render(<App />);
+    type("Origin", "tlv");
+    type("Destination", "ath");
+    type("Date", "2099-01-01");
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await waitFor(() => expect(screen.getByText(NO_FLIGHTS)).toBeTruthy());
+    expect(screen.queryByText("No flights found for this search.")).toBeNull();
+  });
+
+  it("round trip says it too", async () => {
+    mockFetch([["return_date=2099-01-08", 200, { results: [] }]]);
+    render(<App />);
+    pickTrip("Round trip");
+    type("Origin", "tlv");
+    type("Destination", "ath");
+    type("Date", "2099-01-01");
+    type("Return", "2099-01-08");
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await waitFor(() => expect(screen.getByText(NO_FLIGHTS)).toBeTruthy());
+  });
+
+  it("an empty leg of a multi-city search says it too", async () => {
+    await searchMultiCity([
+      ["origin=TLV", 200, { results: [] }],
+      ["origin=ATH", 200, { results: [] }],
+    ]);
+    await waitFor(() => expect(screen.getByText(NO_FLIGHTS)).toBeTruthy());
+  });
+});
+
+describe("swapping origin and destination", () => {
+  const places = [
+    { id: "ATLV", iata_code: "TLV", sub_type: "AIRPORT", name: "Ben Gurion", city_name: "Tel Aviv", search_code: "TLV+" },
+    { id: "CROM", iata_code: "ROM", sub_type: "CITY", name: "Rome", city_name: "Rome", search_code: "ROM" },
+  ];
+  const locationCalls = () =>
+    (fetch as ReturnType<typeof vi.fn>).mock.calls.map(([u]) => u as string).filter((u) => u.startsWith("/api/locations"));
+
+  function mockLocations() {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        const keyword = new URL(url, "http://x").searchParams.get("keyword") ?? "";
+        const results = places.filter((p) => p.name.toLowerCase().startsWith(keyword.toLowerCase()));
+        return Promise.resolve(new Response(JSON.stringify({ results })));
+      }),
+    );
+  }
+
+  async function pick(label: string, typed: string, option: RegExp) {
+    type(label, typed);
+    const list = await screen.findByRole("listbox", { name: `${label} suggestions` });
+    fireEvent.mouseDown(within(list).getByRole("option", { name: option }));
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+  }
+
+  it("does not open the suggestions list nor ask the API again", async () => {
+    mockLocations();
+    render(<SearchForm onSearch={() => {}} disabled={false} />);
+    await pick("Origin", "Ben", /Ben Gurion/);
+    await pick("Destination", "Rom", /Rome/);
+    const before = locationCalls().length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Swap origin and destination" }));
+    // longer than the typeahead's debounce, so a pending search would have fired
+    await new Promise((resolve) => setTimeout(resolve, 450));
+
+    expect((screen.getByLabelText("Origin") as HTMLInputElement).value).toMatch(/Rome/);
+    expect((screen.getByLabelText("Destination") as HTMLInputElement).value).toMatch(/Ben Gurion/);
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(locationCalls()).toHaveLength(before);
+  });
+
+  it("the swapped boxes keep their codes, so the search uses them", async () => {
+    mockLocations();
+    const searches: { origin: string; destination: string }[] = [];
+    render(<SearchForm onSearch={(q) => searches.push(q)} disabled={false} />);
+    await pick("Origin", "Ben", /Ben Gurion/);
+    await pick("Destination", "Rom", /Rome/);
+    type("Date", "2099-01-01");
+    fireEvent.click(screen.getByRole("button", { name: "Swap origin and destination" }));
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(searches[0]).toMatchObject({ origin: "ROM", destination: "TLV+" });
+  });
+
+  it("typing in a swapped box brings the suggestions back", async () => {
+    mockLocations();
+    render(<SearchForm onSearch={() => {}} disabled={false} />);
+    await pick("Origin", "Ben", /Ben Gurion/);
+    await pick("Destination", "Rom", /Rome/);
+    fireEvent.click(screen.getByRole("button", { name: "Swap origin and destination" }));
+
+    type("Origin", "Rom");
+    expect(await screen.findByRole("listbox", { name: "Origin suggestions" })).toBeTruthy();
+  });
+});

@@ -58,6 +58,7 @@ pod from the Service (bookings, deals and health would go down with it).
 | Container port | 8080 |
 | Liveness / Readiness | `GET /` |
 | API access | same origin: nginx proxies `/api/*` to flights-api |
+| Compression | gzip for JSON, JavaScript, CSS and HTML over 1 KiB (a search answer is ~1.6 MB uncompressed) |
 
 The browser never calls Amadeus and never sees the API key.
 
@@ -142,7 +143,7 @@ GET /metrics  → 200 Prometheus text format
 | `duration_minutes` | int | first departure → last arrival, layovers included, computed from the timestamps with their offsets |
 | `total_duration_minutes` | int | same value, named for what it is |
 | `stops` | int | connections (flights − 1) |
-| `primary_airline` | string | name of the first flight's airline |
+| `primary_airline` | string | name of the first flight's airline (acronyms such as ITA, TAP, KLM keep their capitals) |
 | `primary_airline_code` | string\|null | its IATA code |
 | `carriers` | [string] | every distinct airline name, in flight order |
 | `merchant` | string\|null | IATA code of the airline selling the offer |
@@ -320,7 +321,7 @@ hold the old fli shape; readers must not assume one shape for every row.
 - Searches are cached so repeated queries do not spend Amadeus quota.
 - Airline names are resolved in one batched lookup per search for the codes not
   yet cached; unknown codes are cached as the code so they are not looked up again.
-- Errors are never cached; empty results are.
+- Errors and empty results are never cached: a merchant that failed looks like "no offers", and caching that would keep answering "no flights" after the provider recovers.
 - Search, airline and location caches are best-effort: Redis being down turns
   them into misses (logged), not failures. `offer:*` stays strict: bookings must
   not silently treat a Redis outage as "offer expired".
