@@ -128,6 +128,24 @@ Nothing outside `shared/providers/` knows which provider is in use:
 - The search cache key includes the provider name, so a switch never serves
   one provider's offers as another's.
 
+### Destination photos
+
+Deal cards and the strip above the search results show a photo of the
+destination, from the Pixabay API, behind a second small interface:
+
+- **`ImageProvider`** (`shared/images/base.py`): `find_destination_image(city,
+  country)` returns the image **bytes** plus the photographer credit, or `None`.
+  `shared/images/pixabay.py` implements it; `get_image_provider()` picks it.
+- Pixabay's rules, enforced in code: results cached (we keep them 30 days),
+  images are downloaded and served by the API (never hotlinked), and the UI
+  shows "Photo: <user> on Pixabay" linking to the photo page.
+- `PIXABAY_API_KEY` is optional. The key travels as a query parameter, so the
+  URL is a secret: the provider never puts a URL in an error, and a log filter
+  redacts `key=` in httpx's own request logs. Tests assert it is in no log line
+  and no response.
+- Everything is best effort: no key, a Pixabay error or Redis down answer
+  `{"available": false}` and the page keeps its gradient.
+
 ---
 
 ## How the Amadeus API key is provisioned
@@ -168,7 +186,8 @@ cached long; prices are live and are cached briefly.
 |---|---|---|---|
 | `search:{provider}:{o}:{d}:{date}:{adults}:{currency}[:rt:{ret}]` | full search response | `SEARCH_CACHE_TTL`, 600 s | identical searches within 10 min cost no quota |
 | `offer:{offer_id}` | one one-way offer | `OFFER_CACHE_TTL`, 600 s | lets `POST /bookings` find the offer the user saw |
-| `airline:{code}` | airline display name (unknown codes too) | `AIRLINES_CACHE_TTL`, 7 days | one batched lookup per new code, then free |
+| `airline:v2:{code}` | Amadeus's raw airline name, formatted on read (`""` for unknown codes) | `AIRLINES_CACHE_TTL`, 7 days | one batched lookup per new code, then free; a display-format fix needs no cache flush |
+| `destination-image:{key}` | a destination photo (bytes, type, credit) or "none" | `DESTINATION_IMAGE_TTL`, 30 days (7 days for "none") | one Pixabay search + download per place; Pixabay requires at least 24 h |
 | `locations:{keyword}` | typeahead results | `LOCATIONS_CACHE_TTL`, 1 day | popular prefixes ("lon", "mad") are answered from Redis |
 | `deals:top` | worker output | `DEALS_CACHE_TTL`, 7 h | outlives the 6 h CronJob interval |
 
@@ -204,13 +223,14 @@ cd services/web && npm ci && npm run dev
 ```
 
 Without `AMADEUS_API_KEY` everything starts; flight and location searches
-answer 503 `provider_not_configured`.
+answer 503 `provider_not_configured`. `PIXABAY_API_KEY` works the same way and
+is optional: without it the destination photos are replaced by a gradient.
 
 ### Tests and lint
 
 The suites never reach Amadeus: the gateway is an `httpx.MockTransport` with
 canned responses (`services/api/tests/amadeus_fixtures.py`) and Redis is an
-in-memory fake. Conftest removes `AMADEUS_API_KEY` from the environment.
+in-memory fake. Conftest removes `AMADEUS_API_KEY` and `PIXABAY_API_KEY` from the environment.
 
 ```bash
 pip install -r services/api/requirements-dev.txt -r services/worker/requirements-dev.txt ruff==0.17.2
@@ -231,6 +251,8 @@ cd services/web && npm ci && npm run lint && npm test
 | GET | `/metrics` | Prometheus metrics (`provider_errors_total{provider,reason}` among them) |
 | GET | `/flights?origin=&destination=&date=&adults=&return_date=` | Live offers; one-way, or round trip with `return_date` |
 | GET | `/locations?keyword=` | Airport/city typeahead |
+| GET | `/destination-image?city=&country=` | Photo of a place (Pixabay, cached): `{available, url, credit_user, credit_url}` |
+| GET | `/destination-image/file/{key}` | The cached photo's bytes |
 | GET | `/deals?limit=` | Top cached deals from `FLIGHTS_DEFAULT_ORIGIN` |
 | POST | `/bookings` | Record a booking against an offer returned by `/flights` |
 | GET | `/bookings/{id}` | Get a booking |
