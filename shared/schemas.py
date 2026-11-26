@@ -39,6 +39,21 @@ class Leg(BaseModel):
     arrival_country_code: Optional[str] = None
 
 
+class CheckedBag(BaseModel):
+    """One checked-bag allowance included in the fare of a bound."""
+
+    # "piece" (a number of bags, quantity) or "weight" (a weight allowance,
+    # weight_amount + weight_unit). A piece allowance may also carry its weight.
+    type: str
+    quantity: Optional[int] = None
+    weight_amount: Optional[int] = None
+    # "KG" or "LB".
+    weight_unit: Optional[str] = None
+    # 1-based numbers of the bound's flights the allowance applies to; empty
+    # when the provider did not say.
+    applicable_legs: List[int] = Field(default_factory=list)
+
+
 class FlightOffer(BaseModel):
     """One priced itinerary in one direction (one bound)."""
 
@@ -59,6 +74,10 @@ class FlightOffer(BaseModel):
     merchant: Optional[str] = None
     # Redirects to the airline's own booking page. Optional: some offers have none.
     deep_link: Optional[str] = None
+    # Checked bags included in the fare, for THIS bound. None means UNKNOWN (the
+    # provider did not say, or said something unreadable): never show it as "no
+    # bag". An empty list means the provider said that none is included.
+    checked_bags: Optional[List[CheckedBag]] = None
     legs: List[Leg]
 
 

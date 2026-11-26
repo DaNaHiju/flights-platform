@@ -204,3 +204,41 @@ describe("FlightRow choose", () => {
     expect(screen.queryByText(/layover/)).toBeNull();
   });
 });
+
+describe("checked bag badge", () => {
+  const one = [leg({})];
+  const piece = { type: "piece", quantity: 1, weight_amount: 23, weight_unit: "KG", applicable_legs: [1] };
+
+  it("shows the allowance in the row", () => {
+    render(<ul><FlightRow directions={[{ offer: offer(one, { checked_bags: [piece] }) }]} price={800} currency="ILS" /></ul>);
+    expect(screen.getByText("1 checked bag · 23 kg")).toBeTruthy();
+  });
+
+  it("without the field it says the info is not available, and never 'No checked bag'", () => {
+    render(<ul><FlightRow directions={[{ offer: offer(one) }]} price={800} currency="ILS" /></ul>);
+    expect(screen.getByText("Checked bag info not available")).toBeTruthy();
+    expect(screen.queryByText(/No checked bag/)).toBeNull();
+  });
+
+  it("an empty list from the API is 'No checked bag'", () => {
+    render(<ul><FlightRow directions={[{ offer: offer(one, { checked_bags: [] }) }]} price={800} currency="ILS" /></ul>);
+    expect(screen.getByText("No checked bag")).toBeTruthy();
+  });
+
+  it("a round trip shows each direction's own badge", () => {
+    render(
+      <ul>
+        <FlightRow
+          directions={[
+            { label: "Outbound", offer: offer(one, { checked_bags: [piece] }) },
+            { label: "Return", offer: offer(one) },
+          ]}
+          price={1200}
+          currency="ILS"
+        />
+      </ul>,
+    );
+    expect(screen.getByText("1 checked bag · 23 kg")).toBeTruthy();
+    expect(screen.getByText("Checked bag info not available")).toBeTruthy();
+  });
+});

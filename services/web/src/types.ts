@@ -23,6 +23,17 @@ export interface Leg {
   arrival_country_code?: string | null;
 }
 
+// A checked-bag allowance included in the fare of one direction.
+export interface CheckedBag {
+  type: "piece" | "weight" | string;
+  quantity?: number | null;
+  weight_amount?: number | null;
+  // "KG" or "LB".
+  weight_unit?: string | null;
+  // 1-based numbers of the direction's flights it applies to; [] = not said.
+  applicable_legs?: number[];
+}
+
 export interface FlightOffer {
   offer_id: string;
   price: number;
@@ -36,6 +47,10 @@ export interface FlightOffer {
   merchant?: string | null;
   // Redirects to the airline's booking page. Absent on some offers.
   deep_link?: string | null;
+  // Checked bags included in this direction's fare. null or absent = UNKNOWN
+  // (the airline did not say, or the response was cached before the field
+  // existed); [] = the API said that none is included. Never show unknown as "none".
+  checked_bags?: CheckedBag[] | null;
   legs: Leg[];
 }
 

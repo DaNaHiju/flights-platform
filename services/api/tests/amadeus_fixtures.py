@@ -40,9 +40,21 @@ def flight(
     }
 
 
-def result(merchant: str, price: float, bounds: list[list[dict]], deep_link=True, currency="USD"):
+def result(
+    merchant: str,
+    price: float,
+    bounds: list[list[dict]],
+    deep_link=True,
+    currency="USD",
+    bound_extras: list[dict] | None = None,
+):
+    """A search result. *bound_extras[i]* is merged into bound i (e.g. included_checked_bags)."""
+    extras = bound_extras or [{} for _ in bounds]
     body = {
-        "bounds": [{"duration": "00:00", "flights": flights} for flights in bounds],
+        "bounds": [
+            {"duration": "00:00", "flights": flights, **extra}
+            for flights, extra in zip(bounds, extras)
+        ],
         "fare": {
             "currency": currency,
             "itinerary_price": {"total_fare": price, "tax": 10.0},

@@ -7,6 +7,7 @@ import {
   localTime,
   minutesBetween,
 } from "./format";
+import { baggageInfo } from "./baggage";
 import { airlinesOf, totalMinutes } from "./results";
 import type { FlightOffer, Leg } from "./types";
 
@@ -71,6 +72,12 @@ function isOvernight(arriving: Leg, departing: Leg): boolean {
   return dayDifference(arriving.arrival_datetime, departing.departure_datetime) > 0;
 }
 
+// "1 checked bag · 23 kg", or an honest "not available" when the API did not say.
+function BaggageBadge({ offer }: { offer: FlightOffer }) {
+  const { kind, text } = baggageInfo(offer);
+  return <span className={`fr-bag ${kind}`}>{text}</span>;
+}
+
 // Compact line: airlines, times with the stops in the middle, and stops text.
 function Summary({ direction }: { direction: Direction }) {
   const { offer, label } = direction;
@@ -98,7 +105,10 @@ function Summary({ direction }: { direction: Direction }) {
           <span>{end?.arrival_airport_code}</span>
         </span>
       </span>
-      <span className="fr-stops">{stopsText(offer)}</span>
+      <span className="fr-stops">
+        {stopsText(offer)}
+        <BaggageBadge offer={offer} />
+      </span>
     </span>
   );
 }

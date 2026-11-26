@@ -629,6 +629,25 @@ h3 {
   color: var(--muted);
 }
 
+.fr-bag {
+  display: block;
+  margin-top: 4px;
+  font-weight: 700;
+}
+
+.fr-bag.included {
+  color: var(--teal);
+}
+
+.fr-bag.none {
+  color: var(--navy);
+}
+
+.fr-bag.unknown {
+  font-weight: 500;
+  font-style: italic;
+}
+
 .fr-price {
   display: grid;
   justify-items: end;

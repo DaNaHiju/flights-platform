@@ -16,11 +16,14 @@ from shared.providers.amadeus import (
     display_name,
     normalize_keyword,
 )
+from shared.schemas import FlightOffer
 from tests.amadeus_fixtures import (
     AIRLINES,
     AIRLINES_RESPONSE,
     LOCATIONS,
     LOCATIONS_RESPONSE,
+    LY_BACK,
+    LY_DIRECT,
     ROUND_TRIP_RESPONSE,
     SEARCH,
     TEST_API_KEY,
@@ -345,3 +348,84 @@ def test_redis_down_does_not_fail_lookups(monkeypatch):
 def test_locations_response_snapshot_is_unchanged():
     # Guards the fixture itself: the duplicate record must stay in it.
     assert len(LOCATIONS_RESPONSE["data"]) == 3
+
+
+# --- included checked bags -------------------------------------------------------
+
+PIECE_23KG = {"type": "piece", "quantity": 1, "weight_amount": 23, "weight_unit": "KG", "applicable_legs": [1]}
+
+
+def bag_gateway(*results):
+    return FakeGateway().on(SEARCH, {"results": list(results), "errors": {}}).on(
+        AIRLINES, AIRLINES_RESPONSE
+    )
+
+
+def one_way_bags(bound_extra):
+    gw = bag_gateway(result("LY", 250.0, [[LY_DIRECT]], bound_extras=[bound_extra]))
+    return gw.provider().search_one_way("TLV", "MAD", "2099-01-01", 1, "USD")[0].checked_bags
+
+
+def test_one_way_checked_bags_are_parsed_per_bound():
+    bags = one_way_bags(
+        {
+            "included_checked_bags": [
+                PIECE_23KG,
+                {"type": "weight", "weight_amount": 20, "weight_unit": "kg", "applicable_legs": [1, 2]},
+            ]
+        }
+    )
+    assert [b.type for b in bags] == ["piece", "weight"]
+    assert (bags[0].quantity, bags[0].weight_amount, bags[0].weight_unit) == (1, 23, "KG")
+    assert bags[0].applicable_legs == [1]
+    # The unit is normalised to upper case; a weight allowance has no quantity.
+    assert (bags[1].quantity, bags[1].weight_unit, bags[1].applicable_legs) == (None, "KG", [1, 2])
+
+
+def test_missing_included_checked_bags_is_unknown_not_empty():
+    assert one_way_bags({}) is None
+
+
+def test_empty_included_checked_bags_is_a_real_answer():
+    # The provider said "none included": an empty list, which is not None.
+    assert one_way_bags({"included_checked_bags": []}) == []
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        None,
+        "1PC",
+        [{"type": "voucher", "quantity": 1}],
+        [{"quantity": 1}],
+        ["not an object"],
+        [PIECE_23KG, {"type": "piece", "quantity": "many"}],
+    ],
+)
+def test_unreadable_checked_bags_are_unknown_and_never_fail_the_search(bad):
+    assert one_way_bags({"included_checked_bags": bad}) is None
+
+
+def test_round_trip_reads_the_bags_of_each_bound():
+    gw = bag_gateway(
+        result(
+            "LY",
+            520.0,
+            [[LY_DIRECT], [LY_BACK]],
+            bound_extras=[{"included_checked_bags": [PIECE_23KG]}, {}],
+        )
+    )
+    pair = gw.provider().search_round_trip("TLV", "MAD", "2099-01-01", "2099-01-08", 1, "USD")[0]
+    assert pair.outbound.checked_bags[0].weight_amount == 23
+    assert pair.return_.checked_bags is None  # that bound did not say
+
+
+def test_checked_bags_appear_in_the_json_the_api_returns():
+    offer = bag_gateway(
+        result("LY", 250.0, [[LY_DIRECT]], bound_extras=[{"included_checked_bags": [PIECE_23KG]}])
+    ).provider().search_one_way("TLV", "MAD", "2099-01-01", 1, "USD")[0]
+    dumped = offer.model_dump(mode="json")
+    assert dumped["checked_bags"] == [
+        {"type": "piece", "quantity": 1, "weight_amount": 23, "weight_unit": "KG", "applicable_legs": [1]}
+    ]
+    assert FlightOffer.model_validate(dumped) == offer

@@ -29,6 +29,7 @@ from typing import Callable, Iterable
 from urllib.parse import quote
 
 import httpx
+from pydantic import ValidationError
 
 from shared.airports import airport_name
 from shared.cache import try_get_json, try_set_json
@@ -40,6 +41,7 @@ from shared.providers.base import (
     ProviderUnavailableError,
 )
 from shared.schemas import (
+    CheckedBag,
     FlightOffer,
     Leg,
     Location,
@@ -212,6 +214,36 @@ def _elapsed_minutes(departs_at: str, arrives_at: str) -> int | None:
     if start.tzinfo is None or end.tzinfo is None:
         return None
     return int((end - start).total_seconds() // 60)
+
+
+def _checked_bags(bound: dict) -> list[CheckedBag] | None:
+    """The checked bags included in a bound's fare, or None when unknown.
+
+    None covers a bound with no `included_checked_bags` and one with an item we
+    cannot read: a guess ("no bag") would be worse than saying nothing. A list
+    that is present but empty is a real answer, so it stays an empty list.
+    """
+    raw = bound.get("included_checked_bags")
+    if not isinstance(raw, list):
+        return None
+    bags: list[CheckedBag] = []
+    for item in raw:
+        if not isinstance(item, dict) or item.get("type") not in ("piece", "weight"):
+            return None
+        try:
+            unit = item.get("weight_unit")
+            bags.append(
+                CheckedBag(
+                    type=item["type"],
+                    quantity=item.get("quantity"),
+                    weight_amount=item.get("weight_amount"),
+                    weight_unit=unit.upper() if isinstance(unit, str) else None,
+                    applicable_legs=item.get("applicable_legs") or [],
+                )
+            )
+        except ValidationError:
+            return None
+    return bags
 
 
 _SHORT_UPPER = re.compile(r"^[^AEIOUY]{1,3}$")
@@ -417,6 +449,7 @@ class AmadeusProvider:
             carriers=carriers,
             merchant=result.get("merchant"),
             deep_link=result.get("deep_link"),
+            checked_bags=_checked_bags(bound),
             legs=legs,
         )
 

@@ -48,7 +48,8 @@ A search, step by step:
 4. `GET /api/flights?origin=TLV&destination=MAD%2B&date=...` → `flights-api`
    checks the search cache, then calls Amadeus flight search, resolves every
    airline code to a name in one batched (and cached) lookup, and returns
-   provider-neutral offers: price, carriers, local times, duration, stops and
+   provider-neutral offers: price, carriers, local times, duration, stops, the
+   checked bags included in the fare (`null` when the airline did not say) and
    the airline **deep link**.
 5. "Book" opens the deep link: the purchase happens on the airline's own site.
 

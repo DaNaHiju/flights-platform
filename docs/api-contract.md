@@ -147,7 +147,22 @@ GET /metrics  → 200 Prometheus text format
 | `carriers` | [string] | every distinct airline name, in flight order |
 | `merchant` | string\|null | IATA code of the airline selling the offer |
 | `deep_link` | string\|null | airline booking page; absent on some offers — show the offer without a link |
+| `checked_bags` | [CheckedBag]\|null | checked bags included in the fare of **this direction**. **`null` means unknown** (the airline did not say, or the answer was cached before the field existed): never show it as "no bag". `[]` means the airline said none is included |
 | `legs` | [Leg] | |
+
+### CheckedBag
+
+| Field | Type | Notes |
+|---|---|---|
+| `type` | string | `piece` (a number of bags) or `weight` (a weight allowance) |
+| `quantity` | int\|null | bags, when `type` is `piece` |
+| `weight_amount` | int\|null | weight of the allowance (of each bag, for a `piece`), when sent |
+| `weight_unit` | string\|null | `KG` or `LB` |
+| `applicable_legs` | [int] | 1-based numbers of the direction's flights it covers; `[]` = not said |
+
+Amadeus sends it per bound (`included_checked_bags`), so each side of a round
+trip has its own. An item the API cannot read makes the whole field `null`
+instead of failing the search.
 
 ### Leg
 
