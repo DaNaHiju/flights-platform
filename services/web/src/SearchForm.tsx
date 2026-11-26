@@ -10,6 +10,8 @@ export interface Prefill {
   origin: string;
   destination: string;
   date: string;
+  // Set for a round-trip deal: the form opens in Round trip with both dates.
+  returnDate?: string | null;
 }
 
 interface Props {
@@ -17,6 +19,8 @@ interface Props {
   disabled: boolean;
   prefill?: Prefill | null;
 }
+
+const MAX_TRAVELERS = 9;
 
 const MODES: { value: TripMode; label: string }[] = [
   { value: "one-way", label: "One way" },
@@ -33,14 +37,18 @@ export function SearchForm({ onSearch, disabled, prefill }: Props) {
   const [origin2, setOrigin2] = useState<AirportValue>(EMPTY_AIRPORT);
   const [destination2, setDestination2] = useState<AirportValue>(EMPTY_AIRPORT);
   const [date2, setDate2] = useState("");
+  const [adults, setAdults] = useState(1);
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!prefill) return;
-    setMode("one-way");
+    setMode(prefill.returnDate ? "round-trip" : "one-way");
     setOrigin({ text: prefill.origin, code: prefill.origin });
     setDestination({ text: prefill.destination, code: prefill.destination });
     setDate(prefill.date);
+    setReturnDate(prefill.returnDate ?? "");
+    // A deal's price is for one traveler.
+    setAdults(1);
     setFormError(null);
   }, [prefill]);
 
@@ -54,6 +62,7 @@ export function SearchForm({ onSearch, disabled, prefill }: Props) {
     setFormError(null);
     onSearch({
       mode,
+      adults,
       origin: resolveCode(origin),
       destination: resolveCode(destination),
       date,
@@ -68,6 +77,19 @@ export function SearchForm({ onSearch, disabled, prefill }: Props) {
     setOrigin(destination);
     setDestination(origin);
   }
+
+  const travelers = (
+    <label>
+      Travelers
+      <select value={adults} onChange={(e) => setAdults(+e.target.value)}>
+        {Array.from({ length: MAX_TRAVELERS }, (_, i) => i + 1).map((n) => (
+          <option key={n} value={n}>
+            {n} {n === 1 ? "traveler" : "travelers"}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 
   const submit = (
     <button type="submit" className="primary-btn" disabled={disabled}>
@@ -96,7 +118,7 @@ export function SearchForm({ onSearch, disabled, prefill }: Props) {
       </div>
 
       {mode !== "multi-city" && (
-        <div className="fields">
+        <div className={mode === "round-trip" ? "fields" : "fields one-way"}>
           <AirportInput label="Origin" value={origin} onChange={setOrigin} placeholder="City or airport" />
           <button
             type="button"
@@ -113,24 +135,27 @@ export function SearchForm({ onSearch, disabled, prefill }: Props) {
             onChange={setDestination}
             placeholder="City or airport"
           />
-          <label>
-            Date
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-          </label>
-          {mode === "round-trip" ? (
+          {/* One box on a tablet or phone; on a desktop `display: contents` makes
+              its fields direct cells of the row. */}
+          <div className="trip-details">
             <label>
-              Return
-              <input
-                type="date"
-                value={returnDate}
-                min={date}
-                onChange={(e) => setReturnDate(e.target.value)}
-                required
-              />
+              Date
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
             </label>
-          ) : (
-            <span aria-hidden="true" />
-          )}
+            {mode === "round-trip" && (
+              <label>
+                Return
+                <input
+                  type="date"
+                  value={returnDate}
+                  min={date}
+                  onChange={(e) => setReturnDate(e.target.value)}
+                  required
+                />
+              </label>
+            )}
+            {travelers}
+          </div>
           {submit}
         </div>
       )}
@@ -176,7 +201,10 @@ export function SearchForm({ onSearch, disabled, prefill }: Props) {
               </div>
             </div>
           </div>
-          <div className="search-actions">{submit}</div>
+          <div className="search-actions">
+            {travelers}
+            {submit}
+          </div>
         </>
       )}
 

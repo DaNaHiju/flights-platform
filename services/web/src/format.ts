@@ -52,11 +52,33 @@ export function localTime(iso: string): string {
   return iso.slice(11, 16);
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * "2099-01-12" -> "12 Jan". Read from the string, not through Date: a calendar
+ * date has no timezone, and Date would shift it for some viewers.
+ */
+export function formatDay(isoDate: string): string {
+  return `${+isoDate.slice(8, 10)} ${MONTHS[+isoDate.slice(5, 7) - 1]}`;
+}
+
 /** Days between the calendar dates of two local timestamps (0, 1, ...). */
 export function dayDifference(fromIso: string, toIso: string): number {
   const from = Date.UTC(+fromIso.slice(0, 4), +fromIso.slice(5, 7) - 1, +fromIso.slice(8, 10));
   const to = Date.UTC(+toIso.slice(0, 4), +toIso.slice(5, 7) - 1, +toIso.slice(8, 10));
   return Math.round((to - from) / 86_400_000);
+}
+
+/**
+ * Wall-clock minutes of a local timestamp, offset ignored: "2099-01-01T08:30:00+02:00"
+ * and "2099-01-01T08:30:00-05:00" give the same number. For ordering flights by
+ * the time shown on the ticket; never for elapsed time (see minutesBetween).
+ */
+export function localMinutes(iso: string): number {
+  return (
+    Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10), +iso.slice(11, 13), +iso.slice(14, 16)) /
+    60_000
+  );
 }
 
 /** Search code for display: "MAD+" (one airport) shows as "MAD". */

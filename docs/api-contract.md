@@ -58,6 +58,7 @@ pod from the Service (bookings, deals and health would go down with it).
 | Container port | 8080 |
 | Liveness / Readiness | `GET /` |
 | API access | same origin: nginx proxies `/api/*` to flights-api |
+| Compression | gzip for JSON, JavaScript, CSS and HTML over 1 KiB (a search answer is ~1.6 MB uncompressed) |
 
 The browser never calls Amadeus and never sees the API key.
 
@@ -84,6 +85,7 @@ The browser never calls Amadeus and never sees the API key.
 | `AIRLINES_CACHE_TTL` | ConfigMap | 604800 | seconds (7 days) |
 | `LOCATIONS_CACHE_TTL` | ConfigMap | 86400 | seconds (1 day) |
 | `DEALS_CACHE_TTL` | ConfigMap | 25200 | seconds; must exceed the 6 h CronJob interval |
+| `DEALS_TRIP_LENGTH_DAYS` | ConfigMap | 7 | worker: days between a deal's outbound and return |
 | `ENVIRONMENT`, `LOG_LEVEL` | ConfigMap | | |
 
 **Required vs optional.** `DATABASE_URL` (api) and `REDIS_URL` (both) have no
@@ -141,12 +143,27 @@ GET /metrics  → 200 Prometheus text format
 | `duration_minutes` | int | first departure → last arrival, layovers included, computed from the timestamps with their offsets |
 | `total_duration_minutes` | int | same value, named for what it is |
 | `stops` | int | connections (flights − 1) |
-| `primary_airline` | string | name of the first flight's airline |
+| `primary_airline` | string | name of the first flight's airline (acronyms such as ITA, TAP, KLM keep their capitals) |
 | `primary_airline_code` | string\|null | its IATA code |
 | `carriers` | [string] | every distinct airline name, in flight order |
 | `merchant` | string\|null | IATA code of the airline selling the offer |
 | `deep_link` | string\|null | airline booking page; absent on some offers — show the offer without a link |
+| `checked_bags` | [CheckedBag]\|null | checked bags included in the fare of **this direction**. **`null` means unknown** (the airline did not say, or the answer was cached before the field existed): never show it as "no bag". `[]` means the airline said none is included |
 | `legs` | [Leg] | |
+
+### CheckedBag
+
+| Field | Type | Notes |
+|---|---|---|
+| `type` | string | `piece` (a number of bags) or `weight` (a weight allowance) |
+| `quantity` | int\|null | bags, when `type` is `piece` |
+| `weight_amount` | int\|null | weight of the allowance (of each bag, for a `piece`), when sent |
+| `weight_unit` | string\|null | `KG` or `LB` |
+| `applicable_legs` | [int] | 1-based numbers of the direction's flights it covers; `[]` = not said |
+
+Amadeus sends it per bound (`included_checked_bags`), so each side of a round
+trip has its own. An item the API cannot read makes the whole field `null`
+instead of failing the search.
 
 ### Leg
 
@@ -222,6 +239,24 @@ query: limit (int, default 10, max 50)
 
 Deals carry no `deep_link`: prices are live and a deal can be hours old.
 
+```
+Deal: { "destination": "MAD",          # code; the origin is FLIGHTS_DEFAULT_ORIGIN
+        "departure_date": "2099-01-12",
+        "return_date": "2099-01-19"|null,   # null / absent = one-way deal
+        "price": float,                # round trip: total of the cheapest pair
+        "currency": string,
+        "airline": string,             # the outbound flight's airline
+        "total_duration_minutes": int|null,   # the outbound flight's
+        ...origin_* and destination_* names, cities and country codes }
+```
+
+The worker searches one **round trip** per popular destination (one provider
+call each): outbound is today + 30 days, return is outbound +
+`DEALS_TRIP_LENGTH_DAYS`. `price` is the pair's total, so a deal reads "from X ·
+round trip". Same `deals:top` key as before: deals written by an older worker
+have no `return_date` and are one-way deals, still valid until the next run
+replaces them.
+
 ### POST /bookings
 
 ```
@@ -286,7 +321,7 @@ hold the old fli shape; readers must not assume one shape for every row.
 - Searches are cached so repeated queries do not spend Amadeus quota.
 - Airline names are resolved in one batched lookup per search for the codes not
   yet cached; unknown codes are cached as the code so they are not looked up again.
-- Errors are never cached; empty results are.
+- Errors and empty results are never cached: a merchant that failed looks like "no offers", and caching that would keep answering "no flights" after the provider recovers.
 - Search, airline and location caches are best-effort: Redis being down turns
   them into misses (logged), not failures. `offer:*` stays strict: bookings must
   not silently treat a Redis outage as "offer expired".

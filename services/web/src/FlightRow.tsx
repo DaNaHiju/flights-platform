@@ -7,7 +7,8 @@ import {
   localTime,
   minutesBetween,
 } from "./format";
-import { totalMinutes } from "./results";
+import { baggageInfo } from "./baggage";
+import { airlinesOf, totalMinutes } from "./results";
 import type { FlightOffer, Leg } from "./types";
 
 // One direction of a trip. A one-way row has one; a round trip has two.
@@ -29,6 +30,8 @@ interface Props {
   // Review: start expanded and show Book / Go to. Lists never show them.
   review?: boolean;
   bookLabel?: string;
+  // Travelers the price covers. Over 1, the price says "total for N travelers".
+  travelers?: number;
 }
 
 const first = (offer: FlightOffer): Leg | undefined => offer.legs[0];
@@ -44,14 +47,6 @@ function layoverPlace(leg: Leg): string {
 // "Ben Gurion International Airport (TLV)"
 function airportLabel(name: string, code?: string | null): string {
   return code ? `${name} (${code})` : name;
-}
-
-/** Every airline on the route, once, in flying order: "ITA Airways, ANA". */
-function airlinesOf(offers: FlightOffer[]): string[] {
-  const names = offers.flatMap((o) => o.legs.map((leg) => leg.airline));
-  const unique = [...new Set(names.filter(Boolean))];
-  if (unique.length > 0) return unique;
-  return [...new Set(offers.flatMap((o) => o.carriers ?? [o.primary_airline]))];
 }
 
 // Airports where the trip changes planes, in order: the arrival of every leg but the last.
@@ -77,6 +72,12 @@ function changesAirport(arriving: Leg, departing: Leg): boolean {
 // calendar day than the previous one landed, both read as local dates.
 function isOvernight(arriving: Leg, departing: Leg): boolean {
   return dayDifference(arriving.arrival_datetime, departing.departure_datetime) > 0;
+}
+
+// "1 checked bag · 23 kg", or an honest "not available" when the API did not say.
+function BaggageBadge({ offer }: { offer: FlightOffer }) {
+  const { kind, text } = baggageInfo(offer);
+  return <span className={`fr-bag ${kind}`}>{text}</span>;
 }
 
 // Compact line: airlines, times with the stops in the middle, and stops text.
@@ -106,7 +107,10 @@ function Summary({ direction }: { direction: Direction }) {
           <span>{end?.arrival_airport_code}</span>
         </span>
       </span>
-      <span className="fr-stops">{stopsText(offer)}</span>
+      <span className="fr-stops">
+        {stopsText(offer)}
+        <BaggageBadge offer={offer} />
+      </span>
     </span>
   );
 }
@@ -193,6 +197,7 @@ export function FlightRow({
   caption,
   review = false,
   bookLabel = "Book",
+  travelers = 1,
 }: Props) {
   const [open, setOpen] = useState(review);
   const detailId = useId();
@@ -217,6 +222,7 @@ export function FlightRow({
           {pricePrefix && <small className="fr-from">{pricePrefix}</small>}
           <strong>{formatPrice(price, currency)}</strong>
           <small>{caption ?? (roundTrip ? "round trip" : "one way")}</small>
+          {travelers > 1 && <small className="fr-travelers">total for {travelers} travelers</small>}
         </span>
       </button>
       {onChoose && (

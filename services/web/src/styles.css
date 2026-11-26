@@ -220,7 +220,7 @@ a {
 
 .fields {
   display: grid;
-  grid-template-columns: 1.3fr 34px 1.3fr 1fr 1fr auto;
+  grid-template-columns: 1.3fr 34px 1.3fr 1fr 1fr 1fr auto;
   gap: 10px;
   align-items: end;
 }
@@ -331,6 +331,15 @@ input[type="date"] {
   margin: 0 0 12px;
 }
 
+/* One way has no Return column. */
+.fields.one-way {
+  grid-template-columns: 1.3fr 34px 1.3fr 1fr 1fr auto;
+}
+
+.trip-details {
+  display: contents;
+}
+
 .multi-leg-fields {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -339,8 +348,15 @@ input[type="date"] {
 
 .search-actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
   justify-content: flex-end;
+  gap: 10px;
   margin-top: 23px;
+}
+
+.search-actions label {
+  min-width: 170px;
 }
 
 /* ── Airport typeahead ──────────────────────────────────────────────────── */
@@ -629,6 +645,25 @@ h3 {
   color: var(--muted);
 }
 
+.fr-bag {
+  display: block;
+  margin-top: 4px;
+  font-weight: 700;
+}
+
+.fr-bag.included {
+  color: var(--teal);
+}
+
+.fr-bag.none {
+  color: var(--navy);
+}
+
+.fr-bag.unknown {
+  font-weight: 500;
+  font-style: italic;
+}
+
 .fr-price {
   display: grid;
   justify-items: end;
@@ -796,6 +831,25 @@ h3 {
   color: #d6efee;
 }
 
+.sort-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.sort-select select {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+  font: inherit;
+  font-weight: 600;
+  color: var(--navy);
+}
+
 .result-count {
   margin: 0;
   font-size: 13px;
@@ -818,6 +872,125 @@ h3 {
 
 .show-more:hover {
   background: var(--mint);
+}
+
+/* ── Filters: a column beside the list, a collapsible block on a phone ───── */
+.results-layout {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.filters-toggle {
+  display: none;
+  margin-bottom: 12px;
+  padding: 10px 20px;
+  border: 1px solid var(--teal);
+  border-radius: 12px;
+  background: var(--white);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--teal);
+  cursor: pointer;
+}
+
+.filters {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.filters fieldset {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.filters legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.filters-count {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--navy);
+  cursor: pointer;
+}
+
+.check span {
+  flex: 1;
+}
+
+.check small {
+  color: var(--muted);
+}
+
+.filters input[type="checkbox"],
+.filters input[type="range"] {
+  accent-color: var(--teal);
+}
+
+.slider {
+  display: grid;
+  gap: 6px;
+}
+
+.slider-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.slider output {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.clear-filters {
+  padding: 9px 16px;
+  border: 1px solid var(--teal);
+  border-radius: 10px;
+  background: var(--white);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--teal);
+  cursor: pointer;
+}
+
+.clear-filters:disabled {
+  border-color: var(--line);
+  color: var(--muted);
+  cursor: default;
+}
+
+.no-matches {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
 }
 
 /* ── Step selection ─────────────────────────────────────────────────────── */
@@ -1026,6 +1199,10 @@ h3 {
   color: var(--muted);
 }
 
+.deal-price .deal-kind {
+  margin-left: 6px;
+}
+
 .deal-btn {
   margin-top: 12px;
   padding: 10px 14px;
@@ -1076,6 +1253,18 @@ h3 {
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 950px) {
+  .results-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .filters-toggle {
+    display: inline-block;
+  }
+
+  .filters:not(.open) {
+    display: none;
+  }
+
   .fr-line {
     grid-template-columns: minmax(80px, 0.8fr) minmax(190px, 2fr);
   }
@@ -1084,8 +1273,18 @@ h3 {
     grid-column: 2;
   }
 
-  .fields {
+  .fields,
+  .fields.one-way {
     grid-template-columns: 1fr 34px 1fr;
+  }
+
+  /* Date, Return and Travelers share one row below the airports. */
+  .trip-details {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 10px;
   }
 
   .fields > .primary-btn {
@@ -1213,8 +1412,13 @@ h3 {
     font-size: 14px;
   }
 
-  .fields {
+  .fields,
+  .fields.one-way {
     grid-template-columns: 1fr;
+  }
+
+  .trip-details {
+    grid-auto-flow: row;
   }
 
   .swap {

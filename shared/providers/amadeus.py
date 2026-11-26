@@ -29,6 +29,7 @@ from typing import Callable, Iterable
 from urllib.parse import quote
 
 import httpx
+from pydantic import ValidationError
 
 from shared.airports import airport_name
 from shared.cache import try_get_json, try_set_json
@@ -40,6 +41,7 @@ from shared.providers.base import (
     ProviderUnavailableError,
 )
 from shared.schemas import (
+    CheckedBag,
     FlightOffer,
     Leg,
     Location,
@@ -214,14 +216,54 @@ def _elapsed_minutes(departs_at: str, arrives_at: str) -> int | None:
     return int((end - start).total_seconds() // 60)
 
 
+def _checked_bags(bound: dict) -> list[CheckedBag] | None:
+    """The checked bags included in a bound's fare, or None when unknown.
+
+    None covers a bound with no `included_checked_bags` and one with an item we
+    cannot read: a guess ("no bag") would be worse than saying nothing. A list
+    that is present but empty is a real answer, so it stays an empty list.
+    """
+    raw = bound.get("included_checked_bags")
+    if not isinstance(raw, list):
+        return None
+    bags: list[CheckedBag] = []
+    for item in raw:
+        if not isinstance(item, dict) or item.get("type") not in ("piece", "weight"):
+            return None
+        try:
+            unit = item.get("weight_unit")
+            bags.append(
+                CheckedBag(
+                    type=item["type"],
+                    quantity=item.get("quantity"),
+                    weight_amount=item.get("weight_amount"),
+                    weight_unit=unit.upper() if isinstance(unit, str) else None,
+                    applicable_legs=item.get("applicable_legs") or [],
+                )
+            )
+        except ValidationError:
+            return None
+    return bags
+
+
 _SHORT_UPPER = re.compile(r"^[^AEIOUY]{1,3}$")
+# Airline names that are acronyms but contain a vowel, so the consonant rule
+# above would turn them into "Ita" or "Sas". Kept short on purpose: add a name
+# here when an airline shows up wrongly capitalised.
+_KNOWN_ACRONYMS = frozenset({"ITA", "TAP", "LOT", "SAS", "KLM", "ANA", "JAL"})
+
+
+def _display_word(word: str) -> str:
+    if word.upper() in _KNOWN_ACRONYMS:
+        return word.upper()
+    if _SHORT_UPPER.match(word):
+        return word  # consonant-only, such as "KLM": already an acronym
+    return word.capitalize()
 
 
 def display_name(value: str) -> str:
-    """"BRITISH AIRWAYS" -> "British Airways"; consonant-only acronyms ("KLM") stay."""
-    return " ".join(
-        word if _SHORT_UPPER.match(word) else word.capitalize() for word in value.split()
-    )
+    """"BRITISH AIRWAYS" -> "British Airways"; acronyms ("KLM", "ITA") stay upper case."""
+    return " ".join(_display_word(word) for word in value.split())
 
 
 _TRANSLITERATE = str.maketrans(
@@ -326,7 +368,10 @@ class AmadeusProvider:
         if not results and str(errors.get("*", "")).startswith(MERCHANT_RATE_LIMIT_CODES):
             raise ProviderRateLimitedError("Amadeus search-wide rate limit")
         if errors:
-            log.info("Amadeus: %d merchant(s) returned no offers", len(errors))
+            route = ", ".join(
+                f"{o}->{d} on {day}" for o, d, day in zip(origins, destinations, dates)
+            )
+            log.info("Amadeus: %d merchant(s) returned no offers for %s", len(errors), route)
         return [r for r in results if self._total_price(r) is not None]
 
     @staticmethod
@@ -417,6 +462,7 @@ class AmadeusProvider:
             carriers=carriers,
             merchant=result.get("merchant"),
             deep_link=result.get("deep_link"),
+            checked_bags=_checked_bags(bound),
             legs=legs,
         )
 

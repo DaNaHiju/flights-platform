@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useState, type KeyboardEvent } from "react";
 import { searchLocations } from "./api";
 import type { Location } from "./types";
 
@@ -48,13 +48,15 @@ export function AirportInput({ label, value, onChange, placeholder }: Props) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const listId = useId();
-  // The text a pick wrote into the box: no need to search for it again.
-  const pickedText = useRef<string | null>(null);
 
   useEffect(() => {
     const keyword = value.text.trim();
-    if (keyword.length < MIN_CHARS || value.text === pickedText.current) {
+    // A value with a code is already resolved (picked from the list, swapped in
+    // from the other box, or filled by a deal): it needs no suggestions. Typing
+    // sets the code back to null, so suggestions come back as soon as the user edits.
+    if (keyword.length < MIN_CHARS || value.code !== null) {
       setOptions([]);
+      setOpen(false);
       return;
     }
     const controller = new AbortController();
@@ -72,12 +74,10 @@ export function AirportInput({ label, value, onChange, placeholder }: Props) {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [value.text]);
+  }, [value.text, value.code]);
 
   function pick(location: Location) {
-    const text = optionLabel(location);
-    pickedText.current = text;
-    onChange({ text, code: location.search_code });
+    onChange({ text: optionLabel(location), code: location.search_code });
     setOpen(false);
   }
 

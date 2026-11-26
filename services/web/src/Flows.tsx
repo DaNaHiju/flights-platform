@@ -11,6 +11,10 @@ import {
 import { ResultsList } from "./ResultsList";
 import type { FlightOffer, RoundTripOffer } from "./types";
 
+// Shown when a search (or one leg of a multi-city search) comes back empty.
+export const NO_FLIGHTS_MESSAGE =
+  "No airline in our network flies this route on this date. Try the city instead of a single airport, or another date.";
+
 // ── Steps ────────────────────────────────────────────────────────────────────
 // Every trip type is a list of steps ending in a review. `picks[i]` is what was
 // chosen at step i; going back to step i forgets that choice and the later ones.
@@ -112,7 +116,7 @@ function Review({ title, children }: { title: string; children: ReactNode }) {
 
 // ── One way: Choose -> Review ───────────────────────────────────────────────
 
-export function OneWayFlow({ offers }: { offers: FlightOffer[] }) {
+export function OneWayFlow({ offers, adults = 1 }: { offers: FlightOffer[]; adults?: number }) {
   const { step, picks, choose, back } = useSteps<FlightOffer>();
   const ranked = useMemo(() => offers.map(rankOneWay), [offers]);
   const pick = picks[0];
@@ -129,6 +133,7 @@ export function OneWayFlow({ offers }: { offers: FlightOffer[] }) {
           results={ranked}
           renderRow={(offer) => (
             <FlightRow
+              travelers={adults}
               directions={[{ offer }]}
               price={offer.price}
               currency={offer.currency}
@@ -141,6 +146,7 @@ export function OneWayFlow({ offers }: { offers: FlightOffer[] }) {
         <Review title="Review your flight">
           <ul className="offers" aria-label="Your flight">
             <FlightRow
+              travelers={adults}
               review
               directions={[{ offer: pick }]}
               price={pick.price}
@@ -156,7 +162,7 @@ export function OneWayFlow({ offers }: { offers: FlightOffer[] }) {
 
 // ── Round trip: outbound -> return (only those sold with it) -> Review ──────
 
-export function RoundTripFlow({ offers }: { offers: RoundTripOffer[] }) {
+export function RoundTripFlow({ offers, adults = 1 }: { offers: RoundTripOffer[]; adults?: number }) {
   const { step, picks, choose, back } = useSteps<OutboundGroup | RoundTripOffer>();
   const groups = useMemo(() => groupByOutbound(offers).map(rankGroup), [offers]);
   const group = picks[0] as OutboundGroup | undefined;
@@ -175,6 +181,7 @@ export function RoundTripFlow({ offers }: { offers: RoundTripOffer[] }) {
           results={groups}
           renderRow={(g) => (
             <FlightRow
+              travelers={adults}
               directions={[{ offer: g.outbound }]}
               price={g.minPrice}
               currency={g.currency}
@@ -191,6 +198,7 @@ export function RoundTripFlow({ offers }: { offers: RoundTripOffer[] }) {
           results={returns}
           renderRow={(p) => (
             <FlightRow
+              travelers={adults}
               directions={[{ offer: p.return }]}
               price={p.price}
               currency={p.currency}
@@ -204,6 +212,7 @@ export function RoundTripFlow({ offers }: { offers: RoundTripOffer[] }) {
         <Review title="Review your trip">
           <ul className="offers" aria-label="Your trip">
             <FlightRow
+              travelers={adults}
               review
               directions={[
                 { label: "Outbound", offer: pair.outbound },
@@ -235,10 +244,12 @@ export interface LegSearch {
 function LegStep({
   index,
   leg,
+  adults,
   onChoose,
 }: {
   index: number;
   leg: LegSearch;
+  adults: number;
   onChoose: (offer: FlightOffer) => void;
 }) {
   const ranked = useMemo(() => (leg.offers ?? []).map(rankOneWay), [leg.offers]);
@@ -248,12 +259,13 @@ function LegStep({
         Leg {index + 1}: {displayCode(leg.origin)} → {displayCode(leg.destination)} · {leg.date}
       </h3>
       {leg.error && <p role="alert">{leg.error}</p>}
-      {leg.offers?.length === 0 && <p className="status">No flights found for this leg.</p>}
+      {leg.offers?.length === 0 && <p className="status">{NO_FLIGHTS_MESSAGE}</p>}
       <ResultsList
         label={`Flights, leg ${index + 1}`}
         results={ranked}
         renderRow={(offer) => (
           <FlightRow
+            travelers={adults}
             directions={[{ offer }]}
             price={offer.price}
             currency={offer.currency}
@@ -265,7 +277,7 @@ function LegStep({
   );
 }
 
-export function MultiCityFlow({ legs }: { legs: LegSearch[] }) {
+export function MultiCityFlow({ legs, adults = 1 }: { legs: LegSearch[]; adults?: number }) {
   const { step, picks, choose, back } = useSteps<FlightOffer>();
 
   const total =
@@ -280,13 +292,16 @@ export function MultiCityFlow({ legs }: { legs: LegSearch[] }) {
       summaries={picks.map((p) => describe(p, formatPrice(p.price, p.currency)))}
       onChange={back}
     >
-      {step < 2 && <LegStep key={step} index={step} leg={legs[step]} onChoose={choose} />}
+      {step < 2 && <LegStep key={step} index={step} leg={legs[step]} adults={adults} onChoose={choose} />}
       {step === 2 && (
         <Review title="Review your trip">
           <p className="tickets">
             <span className="tl-badge">2 tickets</span>
             {total !== null && (
-              <strong className="total-price">Total: {formatPrice(total, picks[0].currency)}</strong>
+              <strong className="total-price">
+                Total: {formatPrice(total, picks[0].currency)}
+                {adults > 1 && <small> for {adults} travelers</small>}
+              </strong>
             )}
           </p>
           <p className="notice">
@@ -297,6 +312,7 @@ export function MultiCityFlow({ legs }: { legs: LegSearch[] }) {
               <h4>Ticket {i + 1}</h4>
               <ul className="offers" aria-label={`Ticket ${i + 1}`}>
                 <FlightRow
+                  travelers={adults}
                   review
                   bookLabel={`Book ticket ${i + 1}`}
                   directions={[{ offer: p }]}

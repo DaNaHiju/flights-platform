@@ -19,6 +19,7 @@ import {
   dayDifference,
   formatDuration,
   formatPrice,
+  formatDay,
   localTime,
   minutesBetween,
   placeLabel,
@@ -444,7 +445,8 @@ describe("offer details", () => {
     expect(rows().getByText("El Al")).toBeTruthy();
     expect(screen.getByText(/08:00 → 11:00/)).toBeTruthy();
     expect(screen.getByText("6h 20m")).toBeTruthy();
-    expect(screen.getByText("Nonstop")).toBeTruthy();
+    // scoped to the list: the Stops filter has a "Nonstop" option too
+    expect(rows().getByText("Nonstop")).toBeTruthy();
     expect(rows().getByText("one way")).toBeTruthy();
     expect(screen.queryByText(/Ben Gurion International Airport/)).toBeNull();
 
@@ -498,6 +500,38 @@ describe("deals", () => {
     expect(screen.getByText(/Tel Aviv, Israel \(TLV\) → Rome, Italy \(FCO\)/)).toBeTruthy();
     expect(screen.getByText(/Ben Gurion International Airport → Fiumicino/)).toBeTruthy();
     expect(screen.getByText(/ITA Airways · 4h 20m/)).toBeTruthy();
+  });
+
+  it("a round-trip deal shows both dates and 'from X · round trip'", () => {
+    render(
+      <ul>
+        <DealItem deal={{ ...full, departure_date: "2099-01-12", return_date: "2099-01-19" }} />
+      </ul>,
+    );
+    expect(screen.getByText(/^12 Jan – 19 Jan · ITA Airways · 4h 20m$/)).toBeTruthy();
+    expect(screen.getByText("$120").textContent).toContain("from");
+    expect(screen.getByText("· round trip")).toBeTruthy();
+    expect(screen.queryByText("· one way")).toBeNull();
+  });
+
+  it("a deal without return_date is one way, with a single date", () => {
+    render(
+      <ul>
+        <DealItem deal={{ ...full, departure_date: "2099-01-12" }} />
+      </ul>,
+    );
+    expect(screen.getByText(/^12 Jan · ITA Airways/)).toBeTruthy();
+    expect(screen.getByText("· one way")).toBeTruthy();
+    expect(screen.queryByText("· round trip")).toBeNull();
+  });
+
+  it("a null return_date is also one way", () => {
+    render(
+      <ul>
+        <DealItem deal={{ ...full, return_date: null }} />
+      </ul>,
+    );
+    expect(screen.getByText("· one way")).toBeTruthy();
   });
 
   it("tolerates a deal cached without the added fields", () => {
@@ -556,9 +590,163 @@ describe("deals", () => {
     const searched = (fetch as ReturnType<typeof vi.fn>).mock.calls
       .map(([u]) => u as string)
       .find((u) => u.startsWith("/api/flights"));
-    expect(searched).toBe("/api/flights?origin=TLV&destination=FCO&date=2099-02-01");
+    expect(searched).toBe("/api/flights?origin=TLV&destination=FCO&date=2099-02-01&adults=1");
+  });
+
+  it("See flights on a round-trip deal opens Round trip with both dates and searches the pair", async () => {
+    const roundTrip: Deal = { ...full, departure_date: "2099-02-01", return_date: "2099-02-08" };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url.startsWith("/api/deals")) {
+          return Promise.resolve(new Response(JSON.stringify({ deals: [roundTrip] })));
+        }
+        return Promise.resolve(new Response(JSON.stringify({ results: [] })));
+      }),
+    );
+    render(<App />);
+    // The form starts in One way: the deal must switch it.
+    expect(
+      within(screen.getByLabelText("Trip type")).getByRole("button", { name: "One way" }).getAttribute("aria-pressed"),
+    ).toBe("true");
+    fireEvent.click(await screen.findByRole("button", { name: "See flights to Rome, Italy" }));
+
+    await waitFor(() =>
+      expect(
+        within(screen.getByLabelText("Trip type"))
+          .getByRole("button", { name: "Round trip" })
+          .getAttribute("aria-pressed"),
+      ).toBe("true"),
+    );
+    expect((screen.getByLabelText("Date") as HTMLInputElement).value).toBe("2099-02-01");
+    expect((screen.getByLabelText("Return") as HTMLInputElement).value).toBe("2099-02-08");
+    const searched = (fetch as ReturnType<typeof vi.fn>).mock.calls
+      .map(([u]) => u as string)
+      .find((u) => u.startsWith("/api/flights"));
+    expect(searched).toBe(
+      "/api/flights?origin=TLV&destination=FCO&date=2099-02-01&return_date=2099-02-08&adults=1",
+    );
   });
 });
+
+describe("formatDay", () => {
+  it("writes a calendar date as day and short month, without touching timezones", () => {
+    expect(formatDay("2099-01-12")).toBe("12 Jan");
+    expect(formatDay("2099-12-01")).toBe("1 Dec");
+    expect(formatDay("2099-03-31")).toBe("31 Mar");
+  });
+});
+
+// ── Travelers ────────────────────────────────────────────────────────────────
+
+const flightUrls = () =>
+  (fetch as ReturnType<typeof vi.fn>).mock.calls
+    .map(([u]) => u as string)
+    .filter((u) => u.startsWith("/api/flights"));
+
+describe("travelers", () => {
+  it("offers 1 to 9 travelers, defaulting to 1", () => {
+    render(<SearchForm onSearch={() => {}} disabled={false} />);
+    const select = screen.getByLabelText("Travelers") as HTMLSelectElement;
+    expect(select.value).toBe("1");
+    expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "1 traveler",
+      ...[2, 3, 4, 5, 6, 7, 8, 9].map((n) => `${n} travelers`),
+    ]);
+  });
+
+  it("sends adults and labels every price as the total for all travelers", async () => {
+    mockFetch([["origin=TLV", 200, { results: [{ ...flight("a", 300, "LY1", "08"), price: 300 }] }]]);
+    render(<App />);
+    type("Origin", "tlv");
+    type("Destination", "ath");
+    type("Date", "2099-01-01");
+    fireEvent.change(screen.getByLabelText("Travelers"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+
+    await waitFor(() => expect(rows().getByText("total for 2 travelers")).toBeTruthy());
+    expect(flightUrls()[0]).toContain("adults=2");
+    // the price shown is the API's number as is: the backend already totals it
+    expect(rows().getByText("$300")).toBeTruthy();
+
+    // the review step keeps saying it
+    chooseRow(0);
+    await waitFor(() => expect(screen.getByRole("list", { name: "Your flight" })).toBeTruthy());
+    expect(within(screen.getByRole("list", { name: "Your flight" })).getByText("total for 2 travelers")).toBeTruthy();
+  });
+
+  it("with one traveler the price caption is unchanged", async () => {
+    mockFetch([["origin=TLV", 200, { results: [flight("a", 300, "LY1", "08")] }]]);
+    render(<App />);
+    type("Origin", "tlv");
+    type("Destination", "ath");
+    type("Date", "2099-01-01");
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+
+    await waitFor(() => expect(rows().getByText("one way")).toBeTruthy());
+    expect(flightUrls()[0]).toContain("adults=1");
+    expect(screen.queryByText(/total for \d+ travelers/)).toBeNull();
+  });
+
+  it("round trip sends adults too", async () => {
+    mockFetch([["return_date=2099-01-08", 200, { results: [pair(flight("o1", 0, "LY1", "08"), flight("r1", 0, "LY2", "09"), 900)] }]]);
+    render(<App />);
+    pickTrip("Round trip");
+    type("Origin", "tlv");
+    type("Destination", "ath");
+    type("Date", "2099-01-01");
+    type("Return", "2099-01-08");
+    fireEvent.change(screen.getByLabelText("Travelers"), { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+
+    await waitFor(() => expect(screen.getByRole("list", { name: "Outbound flights" })).toBeTruthy());
+    expect(flightUrls()[0]).toContain("adults=3");
+    expect(rows("Outbound flights").getByText("total for 3 travelers")).toBeTruthy();
+  });
+
+  it("multi-city sends the same adults on both legs", async () => {
+    await searchMultiCityWith("4");
+    await waitFor(() => expect(flightUrls()).toHaveLength(2));
+    expect(flightUrls().every((u) => u.includes("adults=4"))).toBe(true);
+  });
+
+  it("a deal's See flights searches for one traveler, whatever was picked before", async () => {
+    const deal: Deal = {
+      destination: "FCO", departure_date: "2099-02-01", price: 120, currency: "USD", airline: "ITA Airways",
+      origin: "TLV", origin_city: "Tel Aviv", origin_country_code: "IL",
+      destination_city: "Rome", destination_country_code: "IT",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) =>
+        Promise.resolve(
+          new Response(JSON.stringify(url.startsWith("/api/deals") ? { deals: [deal] } : { results: [] })),
+        ),
+      ),
+    );
+    render(<App />);
+    fireEvent.change(screen.getByLabelText("Travelers"), { target: { value: "5" } });
+    fireEvent.click(await screen.findByRole("button", { name: "See flights to Rome, Italy" }));
+
+    await waitFor(() => expect(flightUrls()).toHaveLength(1));
+    expect(flightUrls()[0]).toContain("adults=1");
+    expect((screen.getByLabelText("Travelers") as HTMLSelectElement).value).toBe("1");
+  });
+});
+
+async function searchMultiCityWith(travelers: string) {
+  mockFetch([["origin=TLV", 200, { results: [] }], ["origin=ATH", 200, { results: [] }]]);
+  render(<App />);
+  pickTrip("Multi-city");
+  type("Origin", "tlv");
+  type("Destination", "ath");
+  type("Date", "2099-01-01");
+  type("Origin 2", "ath");
+  type("Destination 2", "tlv");
+  type("Date 2", "2099-01-08");
+  fireEvent.change(screen.getByLabelText("Travelers"), { target: { value: travelers } });
+  fireEvent.click(screen.getByRole("button", { name: "Search" }));
+}
 
 describe("language", () => {
   it("has no Spanish strings in src (outside this test)", async () => {
@@ -686,5 +874,110 @@ describe("layover time", () => {
     expect(minutesBetween("2099-01-01T18:00:00+01:00", "2099-01-01T21:45:00+01:00")).toBe(225);
     // different offsets: 23:00-05:00 is 04:00Z, 06:30+02:00 is 04:30Z -> 30 minutes
     expect(minutesBetween("2099-01-01T23:00:00-05:00", "2099-01-02T06:30:00+02:00")).toBe(30);
+  });
+});
+
+// ── Small fixes ──────────────────────────────────────────────────────────────
+
+const NO_FLIGHTS =
+  "No airline in our network flies this route on this date. Try the city instead of a single airport, or another date.";
+
+describe("no results", () => {
+  it("one way says no airline flies the route and suggests the city or another date", async () => {
+    mockFetch([["origin=TLV", 200, { results: [] }]]);
+    render(<App />);
+    type("Origin", "tlv");
+    type("Destination", "ath");
+    type("Date", "2099-01-01");
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await waitFor(() => expect(screen.getByText(NO_FLIGHTS)).toBeTruthy());
+    expect(screen.queryByText("No flights found for this search.")).toBeNull();
+  });
+
+  it("round trip says it too", async () => {
+    mockFetch([["return_date=2099-01-08", 200, { results: [] }]]);
+    render(<App />);
+    pickTrip("Round trip");
+    type("Origin", "tlv");
+    type("Destination", "ath");
+    type("Date", "2099-01-01");
+    type("Return", "2099-01-08");
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    await waitFor(() => expect(screen.getByText(NO_FLIGHTS)).toBeTruthy());
+  });
+
+  it("an empty leg of a multi-city search says it too", async () => {
+    await searchMultiCity([
+      ["origin=TLV", 200, { results: [] }],
+      ["origin=ATH", 200, { results: [] }],
+    ]);
+    await waitFor(() => expect(screen.getByText(NO_FLIGHTS)).toBeTruthy());
+  });
+});
+
+describe("swapping origin and destination", () => {
+  const places = [
+    { id: "ATLV", iata_code: "TLV", sub_type: "AIRPORT", name: "Ben Gurion", city_name: "Tel Aviv", search_code: "TLV+" },
+    { id: "CROM", iata_code: "ROM", sub_type: "CITY", name: "Rome", city_name: "Rome", search_code: "ROM" },
+  ];
+  const locationCalls = () =>
+    (fetch as ReturnType<typeof vi.fn>).mock.calls.map(([u]) => u as string).filter((u) => u.startsWith("/api/locations"));
+
+  function mockLocations() {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        const keyword = new URL(url, "http://x").searchParams.get("keyword") ?? "";
+        const results = places.filter((p) => p.name.toLowerCase().startsWith(keyword.toLowerCase()));
+        return Promise.resolve(new Response(JSON.stringify({ results })));
+      }),
+    );
+  }
+
+  async function pick(label: string, typed: string, option: RegExp) {
+    type(label, typed);
+    const list = await screen.findByRole("listbox", { name: `${label} suggestions` });
+    fireEvent.mouseDown(within(list).getByRole("option", { name: option }));
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+  }
+
+  it("does not open the suggestions list nor ask the API again", async () => {
+    mockLocations();
+    render(<SearchForm onSearch={() => {}} disabled={false} />);
+    await pick("Origin", "Ben", /Ben Gurion/);
+    await pick("Destination", "Rom", /Rome/);
+    const before = locationCalls().length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Swap origin and destination" }));
+    // longer than the typeahead's debounce, so a pending search would have fired
+    await new Promise((resolve) => setTimeout(resolve, 450));
+
+    expect((screen.getByLabelText("Origin") as HTMLInputElement).value).toMatch(/Rome/);
+    expect((screen.getByLabelText("Destination") as HTMLInputElement).value).toMatch(/Ben Gurion/);
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(locationCalls()).toHaveLength(before);
+  });
+
+  it("the swapped boxes keep their codes, so the search uses them", async () => {
+    mockLocations();
+    const searches: { origin: string; destination: string }[] = [];
+    render(<SearchForm onSearch={(q) => searches.push(q)} disabled={false} />);
+    await pick("Origin", "Ben", /Ben Gurion/);
+    await pick("Destination", "Rom", /Rome/);
+    type("Date", "2099-01-01");
+    fireEvent.click(screen.getByRole("button", { name: "Swap origin and destination" }));
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(searches[0]).toMatchObject({ origin: "ROM", destination: "TLV+" });
+  });
+
+  it("typing in a swapped box brings the suggestions back", async () => {
+    mockLocations();
+    render(<SearchForm onSearch={() => {}} disabled={false} />);
+    await pick("Origin", "Ben", /Ben Gurion/);
+    await pick("Destination", "Rom", /Rome/);
+    fireEvent.click(screen.getByRole("button", { name: "Swap origin and destination" }));
+
+    type("Origin", "Rom");
+    expect(await screen.findByRole("listbox", { name: "Origin suggestions" })).toBeTruthy();
   });
 });

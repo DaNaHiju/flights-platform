@@ -23,6 +23,17 @@ export interface Leg {
   arrival_country_code?: string | null;
 }
 
+// A checked-bag allowance included in the fare of one direction.
+export interface CheckedBag {
+  type: "piece" | "weight" | string;
+  quantity?: number | null;
+  weight_amount?: number | null;
+  // "KG" or "LB".
+  weight_unit?: string | null;
+  // 1-based numbers of the direction's flights it applies to; [] = not said.
+  applicable_legs?: number[];
+}
+
 export interface FlightOffer {
   offer_id: string;
   price: number;
@@ -36,12 +47,19 @@ export interface FlightOffer {
   merchant?: string | null;
   // Redirects to the airline's booking page. Absent on some offers.
   deep_link?: string | null;
+  // Checked bags included in this direction's fare. null or absent = UNKNOWN
+  // (the airline did not say, or the response was cached before the field
+  // existed); [] = the API said that none is included. Never show unknown as "none".
+  checked_bags?: CheckedBag[] | null;
   legs: Leg[];
 }
 
 export interface Deal {
   destination: string;
   departure_date: string;
+  // Set on a round-trip deal, whose price is the total of the outbound + return
+  // pair. Absent or null on a one-way deal (also those cached by older workers).
+  return_date?: string | null;
   price: number;
   currency: string;
   airline: string;
@@ -85,6 +103,8 @@ export type TripMode = "one-way" | "round-trip" | "multi-city";
 
 export interface SearchQuery {
   mode: TripMode;
+  // Travelers, 1-9. The price of every offer is the total for all of them.
+  adults: number;
   origin: string;
   destination: string;
   date: string;

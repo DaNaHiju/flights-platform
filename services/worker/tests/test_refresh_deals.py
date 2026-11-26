@@ -3,19 +3,19 @@
 import importlib
 import json
 import os
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
 from shared.providers import ProviderNotConfiguredError, ProviderUnavailableError
-from shared.schemas import FlightOffer
+from shared.schemas import Deal, FlightOffer, RoundTripOffer
 from worker import refresh_deals as job
 from worker.config import settings
 
 
-def _offer(price: float, airline: str = "El Al", duration: int = 315) -> FlightOffer:
-    """A provider-neutral offer; refresh_deals reads price, airline and duration."""
+def _flight(price: float, airline: str, duration: int, tag: str) -> FlightOffer:
     return FlightOffer(
-        offer_id=f"{airline}-{price}",
+        offer_id=f"{airline}-{price}-{tag}",
         price=price,
         currency="USD",
         duration_minutes=duration,
@@ -27,27 +27,50 @@ def _offer(price: float, airline: str = "El Al", duration: int = 315) -> FlightO
     )
 
 
+def _offer(price: float, airline: str = "El Al", duration: int = 315) -> RoundTripOffer:
+    """A round-trip pair; refresh_deals reads its price, outbound airline and duration."""
+    return RoundTripOffer(
+        price=price,
+        currency="USD",
+        deep_link="https://example.test/book",
+        outbound=_flight(price, airline, duration, "out"),
+        # A different airline and duration on the way back, to prove they are ignored.
+        return_=_flight(price, "Return Air", duration + 100, "ret"),
+    )
+
+
 class StubProvider:
     name = "stub"
 
     def __init__(self, results: dict):
         self.results = results
         self.calls = 0
+        self.searches: list[tuple] = []
 
-    def search_one_way(self, origin, destination, date, adults, currency):
+    def search_round_trip(self, origin, destination, date, return_date, adults, currency):
         self.calls += 1
+        self.searches.append((origin, destination, date, return_date, adults, currency))
         outcome = self.results.get(destination, [])
         if isinstance(outcome, Exception):
             raise outcome
         return outcome
 
+    def search_one_way(self, *args, **kwargs):  # pragma: no cover - must not be used
+        raise AssertionError("deals are round trips: search_one_way must not be called")
+
 
 @pytest.fixture
-def fake_search(monkeypatch):
-    """Stub the provider; *results* maps destination -> offers or exception."""
-    results: dict = {}
-    monkeypatch.setattr(job, "get_provider", lambda: StubProvider(results))
-    return results
+def stub(monkeypatch):
+    """The stubbed provider, installed in the job; keeps a record of every search."""
+    provider = StubProvider({})
+    monkeypatch.setattr(job, "get_provider", lambda: provider)
+    return provider
+
+
+@pytest.fixture
+def fake_search(stub):
+    """*results* maps destination -> offers or exception."""
+    return stub.results
 
 
 def _cached(fake_redis) -> dict:
@@ -176,3 +199,81 @@ def test_missing_api_key_stops_after_first_destination(monkeypatch, fake_redis):
     assert job.refresh_deals() == 0
     assert stub.calls == 1
     assert job.DEALS_CACHE_KEY not in fake_redis.store
+
+
+# ── Round-trip deals ─────────────────────────────────────────────────────────
+
+
+def test_searches_a_round_trip_30_days_out_lasting_the_trip_length(fake_search, stub):
+    fake_search["MAD"] = [_offer(100)]
+    before = datetime.now(timezone.utc).date()
+
+    job.refresh_deals()
+
+    after = datetime.now(timezone.utc).date()
+    origin, destination, outbound, back, adults, currency = stub.searches[0]
+    assert (origin, destination, adults) == (settings.FLIGHTS_DEFAULT_ORIGIN, "MAD", 1)
+    assert currency == settings.FLIGHTS_CURRENCY
+    outbound_day = date.fromisoformat(outbound)
+    # `before`/`after` bracket the call, so a run across UTC midnight cannot flake.
+    assert before + timedelta(days=30) <= outbound_day <= after + timedelta(days=30)
+    assert date.fromisoformat(back) - outbound_day == timedelta(days=7)
+
+
+def test_trip_length_comes_from_the_setting(fake_search, stub, monkeypatch):
+    monkeypatch.setattr(settings, "DEALS_TRIP_LENGTH_DAYS", 14)
+    fake_search["MAD"] = [_offer(100)]
+
+    job.refresh_deals()
+
+    _, _, outbound, back, _, _ = stub.searches[0]
+    assert date.fromisoformat(back) - date.fromisoformat(outbound) == timedelta(days=14)
+
+
+def test_default_trip_length_is_7_days_and_is_read_from_env(monkeypatch):
+    from worker import config
+
+    try:
+        monkeypatch.delenv("DEALS_TRIP_LENGTH_DAYS", raising=False)
+        assert importlib.reload(config).settings.DEALS_TRIP_LENGTH_DAYS == 7
+        monkeypatch.setenv("DEALS_TRIP_LENGTH_DAYS", "10")
+        assert importlib.reload(config).settings.DEALS_TRIP_LENGTH_DAYS == 10
+    finally:
+        monkeypatch.undo()
+        importlib.reload(config)
+
+
+def test_one_search_call_per_destination_and_never_one_way(fake_search, stub):
+    for destination in job.POPULAR_DESTINATIONS:
+        fake_search[destination] = [_offer(100)]
+
+    job.refresh_deals()
+
+    assert stub.calls == len(job.POPULAR_DESTINATIONS)
+
+
+def test_deal_keeps_the_cheapest_pair_with_its_total_and_both_dates(fake_search, stub, fake_redis):
+    fake_search["MAD"] = [_offer(900, "Dear Air"), _offer(640, "Cheap Air", duration=400)]
+
+    job.refresh_deals()
+
+    deal = _cached(fake_redis)["deals"][0]
+    assert deal["price"] == 640  # the pair's total, not one leg's price
+    assert deal["airline"] == "Cheap Air"  # the outbound's, not "Return Air"
+    assert deal["total_duration_minutes"] == 400  # the outbound's
+    _, _, outbound, back, _, _ = stub.searches[0]
+    assert (deal["departure_date"], deal["return_date"]) == (outbound, back)
+
+
+def test_cached_round_trip_deal_matches_the_deal_schema(fake_search, fake_redis):
+    fake_search["MAD"] = [_offer(250)]
+    job.refresh_deals()
+    deal = Deal.model_validate(_cached(fake_redis)["deals"][0])
+    assert deal.return_date is not None
+
+
+def test_one_way_deals_already_in_redis_still_validate():
+    # What the worker wrote before round-trip deals existed: no return_date key.
+    old = {"destination": "MAD", "departure_date": "2099-01-01", "price": 250.0,
+           "currency": "USD", "airline": "El Al"}
+    assert Deal.model_validate(old).return_date is None

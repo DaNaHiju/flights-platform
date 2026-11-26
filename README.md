@@ -45,12 +45,36 @@ A search, step by step:
 3. The user picks *Adolfo Suarez Barajas (MAD)*. The form keeps its
    `search_code`, `MAD+` (the `+` pins that airport; a city pick sends `MAD`,
    covering every airport of the city).
-4. `GET /api/flights?origin=TLV&destination=MAD%2B&date=...` → `flights-api`
+4. `GET /api/flights?origin=TLV&destination=MAD%2B&date=...&adults=2` → `flights-api`
    checks the search cache, then calls Amadeus flight search, resolves every
    airline code to a name in one batched (and cached) lookup, and returns
-   provider-neutral offers: price, carriers, local times, duration, stops and
+   provider-neutral offers: price, carriers, local times, duration, stops, the
+   checked bags included in the fare (`null` when the airline did not say) and
    the airline **deep link**.
 5. "Book" opens the deep link: the purchase happens on the airline's own site.
+
+The form's **Travelers** menu (1–9) is sent as `adults`. Every price is the
+total for all travelers, and the rows say so ("total for 2 travelers"). A
+deal's "See flights" always searches for one traveler, which is what its price
+covers.
+
+Everything after step 4 happens in the browser, on the offers already returned
+(no extra API calls). Each step's list can be sorted with the tabs (Best,
+Cheapest, Fastest) or the **Sort by** menu: Best, Price, Duration, Departure
+time, Arrival time and Stops. Price and Duration are the Cheapest and Fastest
+tabs, so both controls always agree. Departure and arrival are the **local**
+clock time of the API's string, never converted, of the flight that step shows
+(the return flight in the return step). Stops puts nonstop first and breaks ties
+by price.
+
+The same lists can be **filtered**, again without calling the API: a panel on
+the left (the "Filters" button on a phone) with Stops (Nonstop / 1 / 2+, each
+with its count), Airlines, Departure time (local: Morning 05–12, Afternoon
+12–18, Evening 18–24, Night 00–05), Max price and Max duration, plus "Clear
+filters" and "Showing N of M". Inside a group (say, two airlines) an offer needs
+to match any ticked box; across groups it needs to match all of them. Filters
+apply to the flight each step shows, so in the return step they look at the
+return flight. Sorting and "Show more" work on the filtered list.
 
 ### Layout
 
@@ -66,7 +90,7 @@ shared/                       Code shared by api and worker (imported as shared.
 └── config.py                 Shared settings, require_env()
 services/
 ├── api/                      FastAPI: /flights, /locations, /deals, /bookings, probes, /metrics
-├── worker/                   refresh_deals: cheapest offer per popular route → Redis
+├── worker/                   refresh_deals: cheapest round trip per popular route → Redis
 └── web/                      React + Vite, served by nginx-unprivileged
 docs/api-contract.md          Endpoints, schemas, env vars, error codes
 ```
@@ -151,7 +175,7 @@ cached long; prices are live and are cached briefly.
 Also part of the strategy:
 
 - The typeahead is debounced (250 ms) and skips keywords under 2 characters.
-- Errors are never cached; empty results are.
+- Errors and empty results are never cached: a merchant that failed looks like "no offers", and caching that would keep answering "no flights" after the provider recovers.
 - Redis being down makes searches slower (cache misses), not failing.
 - Retries are bounded: one retry after a 5xx, one inline wait after a 429 only
   if `Retry-After` ≤ 2 s; timeouts are not retried. Otherwise the client gets
