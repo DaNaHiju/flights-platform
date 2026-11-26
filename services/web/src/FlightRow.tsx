@@ -30,6 +30,8 @@ interface Props {
   // Review: start expanded and show Book / Go to. Lists never show them.
   review?: boolean;
   bookLabel?: string;
+  // Travelers the price covers. Over 1, the price says "total for N travelers".
+  travelers?: number;
 }
 
 const first = (offer: FlightOffer): Leg | undefined => offer.legs[0];
@@ -195,6 +197,7 @@ export function FlightRow({
   caption,
   review = false,
   bookLabel = "Book",
+  travelers = 1,
 }: Props) {
   const [open, setOpen] = useState(review);
   const detailId = useId();
@@ -219,6 +222,7 @@ export function FlightRow({
           {pricePrefix && <small className="fr-from">{pricePrefix}</small>}
           <strong>{formatPrice(price, currency)}</strong>
           <small>{caption ?? (roundTrip ? "round trip" : "one way")}</small>
+          {travelers > 1 && <small className="fr-travelers">total for {travelers} travelers</small>}
         </span>
       </button>
       {onChoose && (

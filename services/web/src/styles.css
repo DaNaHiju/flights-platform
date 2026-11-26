@@ -220,7 +220,7 @@ a {
 
 .fields {
   display: grid;
-  grid-template-columns: 1.3fr 34px 1.3fr 1fr 1fr auto;
+  grid-template-columns: 1.3fr 34px 1.3fr 1fr 1fr 1fr auto;
   gap: 10px;
   align-items: end;
 }
@@ -331,6 +331,15 @@ input[type="date"] {
   margin: 0 0 12px;
 }
 
+/* One way has no Return column. */
+.fields.one-way {
+  grid-template-columns: 1.3fr 34px 1.3fr 1fr 1fr auto;
+}
+
+.trip-details {
+  display: contents;
+}
+
 .multi-leg-fields {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -339,8 +348,15 @@ input[type="date"] {
 
 .search-actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
   justify-content: flex-end;
+  gap: 10px;
   margin-top: 23px;
+}
+
+.search-actions label {
+  min-width: 170px;
 }
 
 /* ── Airport typeahead ──────────────────────────────────────────────────── */
@@ -1257,8 +1273,18 @@ h3 {
     grid-column: 2;
   }
 
-  .fields {
+  .fields,
+  .fields.one-way {
     grid-template-columns: 1fr 34px 1fr;
+  }
+
+  /* Date, Return and Travelers share one row below the airports. */
+  .trip-details {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 10px;
   }
 
   .fields > .primary-btn {
@@ -1386,8 +1412,13 @@ h3 {
     font-size: 14px;
   }
 
-  .fields {
+  .fields,
+  .fields.one-way {
     grid-template-columns: 1fr;
+  }
+
+  .trip-details {
+    grid-auto-flow: row;
   }
 
   .swap {

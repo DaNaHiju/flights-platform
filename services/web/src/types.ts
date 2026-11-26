@@ -103,6 +103,8 @@ export type TripMode = "one-way" | "round-trip" | "multi-city";
 
 export interface SearchQuery {
   mode: TripMode;
+  // Travelers, 1-9. The price of every offer is the total for all of them.
+  adults: number;
   origin: string;
   destination: string;
   date: string;

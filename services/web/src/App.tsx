@@ -14,9 +14,15 @@ async function searchLeg(
   origin: string,
   destination: string,
   date: string,
+  adults: number,
 ): Promise<LegSearch> {
   try {
-    return { origin, destination, date, offers: await searchFlights(origin, destination, date) };
+    return {
+      origin,
+      destination,
+      date,
+      offers: await searchFlights(origin, destination, date, adults),
+    };
   } catch (err) {
     return { origin, destination, date, error: errorText(err) };
   }
@@ -25,7 +31,7 @@ async function searchLeg(
 type Results =
   | { kind: "one-way"; query: SearchQuery; offers: FlightOffer[] }
   | { kind: "round-trip"; query: SearchQuery; offers: RoundTripOffer[] }
-  | { kind: "multi-city"; legs: LegSearch[] };
+  | { kind: "multi-city"; legs: LegSearch[]; adults: number };
 
 function Brand({ footer = false }: { footer?: boolean }) {
   return (
@@ -73,20 +79,26 @@ export default function App() {
     try {
       if (query.mode === "multi-city") {
         const legs = await Promise.all([
-          searchLeg(query.origin, query.destination, query.date),
-          searchLeg(query.origin2, query.destination2, query.date2),
+          searchLeg(query.origin, query.destination, query.date, query.adults),
+          searchLeg(query.origin2, query.destination2, query.date2, query.adults),
         ]);
-        setResults({ kind: "multi-city", legs });
+        setResults({ kind: "multi-city", legs, adults: query.adults });
       } else if (query.mode === "round-trip") {
         const offers = await searchRoundTrip(
           query.origin,
           query.destination,
           query.date,
           query.returnDate,
+          query.adults,
         );
         setResults({ kind: "round-trip", query, offers });
       } else {
-        const offers = await searchFlights(query.origin, query.destination, query.date);
+        const offers = await searchFlights(
+          query.origin,
+          query.destination,
+          query.date,
+          query.adults,
+        );
         setResults({ kind: "one-way", query, offers });
       }
     } catch (err) {
@@ -110,6 +122,7 @@ export default function App() {
     });
     void handleSearch({
       mode: deal.return_date ? "round-trip" : "one-way",
+      adults: 1,
       origin: deal.origin,
       destination: deal.destination,
       date: deal.departure_date,
@@ -169,17 +182,17 @@ export default function App() {
                 (results.offers.length === 0 ? (
                   <p className="status">No flights found for this search.</p>
                 ) : (
-                  <OneWayFlow offers={results.offers} />
+                  <OneWayFlow offers={results.offers} adults={results.query.adults} />
                 ))}
 
               {results?.kind === "round-trip" &&
                 (results.offers.length === 0 ? (
                   <p className="status">No flights found for this search.</p>
                 ) : (
-                  <RoundTripFlow offers={results.offers} />
+                  <RoundTripFlow offers={results.offers} adults={results.query.adults} />
                 ))}
 
-              {results?.kind === "multi-city" && <MultiCityFlow legs={results.legs} />}
+              {results?.kind === "multi-city" && <MultiCityFlow legs={results.legs} adults={results.adults} />}
             </div>
           </section>
         )}

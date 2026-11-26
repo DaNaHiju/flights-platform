@@ -46,8 +46,9 @@ export async function searchFlights(
   origin: string,
   destination: string,
   date: string,
+  adults = 1,
 ): Promise<FlightOffer[]> {
-  const query = new URLSearchParams({ origin, destination, date });
+  const query = new URLSearchParams({ origin, destination, date, adults: String(adults) });
   const data = await get<{ results: FlightOffer[] }>(`/flights?${query}`);
   return data.results;
 }
@@ -57,12 +58,14 @@ export async function searchRoundTrip(
   destination: string,
   date: string,
   returnDate: string,
+  adults = 1,
 ): Promise<RoundTripOffer[]> {
   const query = new URLSearchParams({
     origin,
     destination,
     date,
     return_date: returnDate,
+    adults: String(adults),
   });
   const data = await get<{ results: RoundTripOffer[] }>(`/flights?${query}`);
   return data.results;

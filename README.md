@@ -45,13 +45,18 @@ A search, step by step:
 3. The user picks *Adolfo Suarez Barajas (MAD)*. The form keeps its
    `search_code`, `MAD+` (the `+` pins that airport; a city pick sends `MAD`,
    covering every airport of the city).
-4. `GET /api/flights?origin=TLV&destination=MAD%2B&date=...` → `flights-api`
+4. `GET /api/flights?origin=TLV&destination=MAD%2B&date=...&adults=2` → `flights-api`
    checks the search cache, then calls Amadeus flight search, resolves every
    airline code to a name in one batched (and cached) lookup, and returns
    provider-neutral offers: price, carriers, local times, duration, stops, the
    checked bags included in the fare (`null` when the airline did not say) and
    the airline **deep link**.
 5. "Book" opens the deep link: the purchase happens on the airline's own site.
+
+The form's **Travelers** menu (1–9) is sent as `adults`. Every price is the
+total for all travelers, and the rows say so ("total for 2 travelers"). A
+deal's "See flights" always searches for one traveler, which is what its price
+covers.
 
 Everything after step 4 happens in the browser, on the offers already returned
 (no extra API calls). Each step's list can be sorted with the tabs (Best,
