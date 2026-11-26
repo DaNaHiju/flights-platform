@@ -15,7 +15,7 @@ from shared.images import ImageProviderError, get_image_provider
 from shared.images.pixabay import MAX_IMAGE_BYTES, PixabayProvider
 
 # Distinctive on purpose: the tests search every log line and response for it.
-SECRET = "pixabay-secret-key-9f8e7d"
+SECRET = "TEST-ONLY-not-a-real-pixabay-key"
 JPEG = b"\xff\xd8\xff\xe0" + b"x" * 1000
 PAGE_URL = "https://pixabay.com/photos/hanoi-lake-1234/"
 IMAGE_URL = "https://pixabay.com/get/abc_1280.jpg"
