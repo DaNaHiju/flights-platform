@@ -70,6 +70,7 @@ export function SearchForm({ onSearch, disabled, prefill }: Props) {
       origin2: resolveCode(origin2),
       destination2: resolveCode(destination2),
       date2,
+      destinationPlace: destination.place,
     });
   }
 

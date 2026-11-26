@@ -99,6 +99,20 @@ export interface Location {
   search_code: string;
 }
 
+// GET /destination-image. `url` is relative to the API root: use destinationImageUrl().
+export interface DestinationImage {
+  available: boolean;
+  url: string | null;
+  credit_user: string | null;
+  credit_url: string | null;
+}
+
+// A destination as shown to people: "Hanoi, Vietnam". country may be "" when unknown.
+export interface DestinationPlace {
+  city: string;
+  country: string;
+}
+
 export type TripMode = "one-way" | "round-trip" | "multi-city";
 
 export interface SearchQuery {
@@ -114,4 +128,7 @@ export interface SearchQuery {
   origin2: string;
   destination2: string;
   date2: string;
+  // The place picked from the autocomplete (or taken from a deal). Absent when
+  // the destination was typed as a bare code.
+  destinationPlace?: DestinationPlace;
 }

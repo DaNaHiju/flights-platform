@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   countryName,
   formatDay,
@@ -8,32 +7,14 @@ import {
   secondaryAirport,
   type Place,
 } from "./format";
+import { DestinationPhoto } from "./DestinationPhoto";
+import { dealPlace } from "./destination";
 import type { Deal } from "./types";
 
 // "Rome, Italy" for the title; the full place label when the city is unknown.
 function title(to: Place): string {
   if (to.city && to.countryCode) return `${to.city}, ${countryName(to.countryCode)}`;
   return placeLabel(to);
-}
-
-// The photo of a destination lives in public/destinations/<CODE>.webp. Without
-// one (or if it fails to load) the card keeps its gradient.
-function Photo({ code, name }: { code: string; name: string }) {
-  const [failed, setFailed] = useState(false);
-  return (
-    <div className="deal-photo">
-      {!failed && (
-        <img
-          src={`/destinations/${code}.webp`}
-          alt={`View of ${name}`}
-          loading="lazy"
-          width={800}
-          height={500}
-          onError={() => setFailed(true)}
-        />
-      )}
-    </div>
-  );
 }
 
 interface Props {
@@ -62,6 +43,8 @@ export function DealItem({ deal, onSeeFlights }: Props) {
   const fromSecondary = secondaryAirport(from);
   const toSecondary = secondaryAirport(to);
   const name = title(to);
+  // Deals cached without a city have nothing to look a photo up by: gradient only.
+  const place = dealPlace(deal);
   // "12 Jan – 19 Jan" for a round trip, "12 Jan" for a one-way deal.
   const dates = deal.return_date
     ? `${formatDay(deal.departure_date)} – ${formatDay(deal.return_date)}`
@@ -69,7 +52,12 @@ export function DealItem({ deal, onSeeFlights }: Props) {
 
   return (
     <li className="deal-card">
-      <Photo code={deal.destination} name={name} />
+      <DestinationPhoto
+        city={place?.city}
+        country={place?.country}
+        alt={`View of ${name}`}
+        className="deal-photo"
+      />
       <div className="deal-body">
         <strong className="deal-title">{name}</strong>
         {fromLabel && (
