@@ -10,6 +10,8 @@ export interface Prefill {
   origin: string;
   destination: string;
   date: string;
+  // Set for a round-trip deal: the form opens in Round trip with both dates.
+  returnDate?: string | null;
 }
 
 interface Props {
@@ -37,10 +39,11 @@ export function SearchForm({ onSearch, disabled, prefill }: Props) {
 
   useEffect(() => {
     if (!prefill) return;
-    setMode("one-way");
+    setMode(prefill.returnDate ? "round-trip" : "one-way");
     setOrigin({ text: prefill.origin, code: prefill.origin });
     setDestination({ text: prefill.destination, code: prefill.destination });
     setDate(prefill.date);
+    setReturnDate(prefill.returnDate ?? "");
     setFormError(null);
   }, [prefill]);
 

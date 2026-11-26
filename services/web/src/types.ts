@@ -42,6 +42,9 @@ export interface FlightOffer {
 export interface Deal {
   destination: string;
   departure_date: string;
+  // Set on a round-trip deal, whose price is the total of the outbound + return
+  // pair. Absent or null on a one-way deal (also those cached by older workers).
+  return_date?: string | null;
   price: number;
   currency: string;
   airline: string;

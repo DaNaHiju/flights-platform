@@ -20,6 +20,8 @@ class Settings(SharedSettings):
     """Worker settings; inherits REDIS_URL, LOG_LEVEL, ENVIRONMENT, APP_NAME, ..."""
 
     FLIGHTS_DEFAULT_ORIGIN: str = os.getenv("FLIGHTS_DEFAULT_ORIGIN", "TLV")
+    # Days between the outbound and the return of a deal (a round trip).
+    DEALS_TRIP_LENGTH_DAYS: int = int(os.getenv("DEALS_TRIP_LENGTH_DAYS", "7"))
     # Must exceed the CronJob interval (6 h = 21600 s), or /deals expires between
     # runs; default is the interval plus 1 h of margin.
     DEALS_CACHE_TTL: int = int(os.getenv("DEALS_CACHE_TTL", "25200"))

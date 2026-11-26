@@ -52,6 +52,16 @@ export function localTime(iso: string): string {
   return iso.slice(11, 16);
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * "2099-01-12" -> "12 Jan". Read from the string, not through Date: a calendar
+ * date has no timezone, and Date would shift it for some viewers.
+ */
+export function formatDay(isoDate: string): string {
+  return `${+isoDate.slice(8, 10)} ${MONTHS[+isoDate.slice(5, 7) - 1]}`;
+}
+
 /** Days between the calendar dates of two local timestamps (0, 1, ...). */
 export function dayDifference(fromIso: string, toIso: string): number {
   const from = Date.UTC(+fromIso.slice(0, 4), +fromIso.slice(5, 7) - 1, +fromIso.slice(8, 10));

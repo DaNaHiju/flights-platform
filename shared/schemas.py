@@ -99,6 +99,10 @@ class Deal(BaseModel):
 
     destination: str
     departure_date: str
+    # Set when the deal is a round trip; None for a one-way deal. Deals cached
+    # before round-trip deals existed have no such key and still validate.
+    return_date: Optional[str] = None
+    # For a round trip, the total of the cheapest outbound + return pair.
     price: float
     currency: str
     airline: str

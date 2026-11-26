@@ -84,6 +84,7 @@ The browser never calls Amadeus and never sees the API key.
 | `AIRLINES_CACHE_TTL` | ConfigMap | 604800 | seconds (7 days) |
 | `LOCATIONS_CACHE_TTL` | ConfigMap | 86400 | seconds (1 day) |
 | `DEALS_CACHE_TTL` | ConfigMap | 25200 | seconds; must exceed the 6 h CronJob interval |
+| `DEALS_TRIP_LENGTH_DAYS` | ConfigMap | 7 | worker: days between a deal's outbound and return |
 | `ENVIRONMENT`, `LOG_LEVEL` | ConfigMap | | |
 
 **Required vs optional.** `DATABASE_URL` (api) and `REDIS_URL` (both) have no
@@ -221,6 +222,24 @@ query: limit (int, default 10, max 50)
 ```
 
 Deals carry no `deep_link`: prices are live and a deal can be hours old.
+
+```
+Deal: { "destination": "MAD",          # code; the origin is FLIGHTS_DEFAULT_ORIGIN
+        "departure_date": "2099-01-12",
+        "return_date": "2099-01-19"|null,   # null / absent = one-way deal
+        "price": float,                # round trip: total of the cheapest pair
+        "currency": string,
+        "airline": string,             # the outbound flight's airline
+        "total_duration_minutes": int|null,   # the outbound flight's
+        ...origin_* and destination_* names, cities and country codes }
+```
+
+The worker searches one **round trip** per popular destination (one provider
+call each): outbound is today + 30 days, return is outbound +
+`DEALS_TRIP_LENGTH_DAYS`. `price` is the pair's total, so a deal reads "from X ·
+round trip". Same `deals:top` key as before: deals written by an older worker
+have no `return_date` and are one-way deals, still valid until the next run
+replaces them.
 
 ### POST /bookings
 

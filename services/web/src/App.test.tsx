@@ -19,6 +19,7 @@ import {
   dayDifference,
   formatDuration,
   formatPrice,
+  formatDay,
   localTime,
   minutesBetween,
   placeLabel,
@@ -501,6 +502,38 @@ describe("deals", () => {
     expect(screen.getByText(/ITA Airways · 4h 20m/)).toBeTruthy();
   });
 
+  it("a round-trip deal shows both dates and 'from X · round trip'", () => {
+    render(
+      <ul>
+        <DealItem deal={{ ...full, departure_date: "2099-01-12", return_date: "2099-01-19" }} />
+      </ul>,
+    );
+    expect(screen.getByText(/^12 Jan – 19 Jan · ITA Airways · 4h 20m$/)).toBeTruthy();
+    expect(screen.getByText("$120").textContent).toContain("from");
+    expect(screen.getByText("· round trip")).toBeTruthy();
+    expect(screen.queryByText("· one way")).toBeNull();
+  });
+
+  it("a deal without return_date is one way, with a single date", () => {
+    render(
+      <ul>
+        <DealItem deal={{ ...full, departure_date: "2099-01-12" }} />
+      </ul>,
+    );
+    expect(screen.getByText(/^12 Jan · ITA Airways/)).toBeTruthy();
+    expect(screen.getByText("· one way")).toBeTruthy();
+    expect(screen.queryByText("· round trip")).toBeNull();
+  });
+
+  it("a null return_date is also one way", () => {
+    render(
+      <ul>
+        <DealItem deal={{ ...full, return_date: null }} />
+      </ul>,
+    );
+    expect(screen.getByText("· one way")).toBeTruthy();
+  });
+
   it("tolerates a deal cached without the added fields", () => {
     render(
       <ul>
@@ -558,6 +591,47 @@ describe("deals", () => {
       .map(([u]) => u as string)
       .find((u) => u.startsWith("/api/flights"));
     expect(searched).toBe("/api/flights?origin=TLV&destination=FCO&date=2099-02-01");
+  });
+
+  it("See flights on a round-trip deal opens Round trip with both dates and searches the pair", async () => {
+    const roundTrip: Deal = { ...full, departure_date: "2099-02-01", return_date: "2099-02-08" };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        if (url.startsWith("/api/deals")) {
+          return Promise.resolve(new Response(JSON.stringify({ deals: [roundTrip] })));
+        }
+        return Promise.resolve(new Response(JSON.stringify({ results: [] })));
+      }),
+    );
+    render(<App />);
+    // The form starts in One way: the deal must switch it.
+    expect(
+      within(screen.getByLabelText("Trip type")).getByRole("button", { name: "One way" }).getAttribute("aria-pressed"),
+    ).toBe("true");
+    fireEvent.click(await screen.findByRole("button", { name: "See flights to Rome, Italy" }));
+
+    await waitFor(() =>
+      expect(
+        within(screen.getByLabelText("Trip type"))
+          .getByRole("button", { name: "Round trip" })
+          .getAttribute("aria-pressed"),
+      ).toBe("true"),
+    );
+    expect((screen.getByLabelText("Date") as HTMLInputElement).value).toBe("2099-02-01");
+    expect((screen.getByLabelText("Return") as HTMLInputElement).value).toBe("2099-02-08");
+    const searched = (fetch as ReturnType<typeof vi.fn>).mock.calls
+      .map(([u]) => u as string)
+      .find((u) => u.startsWith("/api/flights"));
+    expect(searched).toBe("/api/flights?origin=TLV&destination=FCO&date=2099-02-01&return_date=2099-02-08");
+  });
+});
+
+describe("formatDay", () => {
+  it("writes a calendar date as day and short month, without touching timezones", () => {
+    expect(formatDay("2099-01-12")).toBe("12 Jan");
+    expect(formatDay("2099-12-01")).toBe("1 Dec");
+    expect(formatDay("2099-03-31")).toBe("31 Mar");
   });
 });
 

@@ -1164,6 +1164,10 @@ h3 {
   color: var(--muted);
 }
 
+.deal-price .deal-kind {
+  margin-left: 6px;
+}
+
 .deal-btn {
   margin-top: 12px;
   padding: 10px 14px;

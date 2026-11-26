@@ -97,7 +97,8 @@ export default function App() {
   }
 
   // A deal's "See flights": fill the form, search live and scroll to the results.
-  // The deal's cached price is not reused: the search shows the current fares.
+  // A round-trip deal opens the form in Round trip with both of its dates. The
+  // deal's cached price is not reused: the search shows the current fares.
   function handleSeeFlights(deal: Deal) {
     if (!deal.origin) return;
     setPrefill({
@@ -105,13 +106,14 @@ export default function App() {
       origin: deal.origin,
       destination: deal.destination,
       date: deal.departure_date,
+      returnDate: deal.return_date,
     });
     void handleSearch({
-      mode: "one-way",
+      mode: deal.return_date ? "round-trip" : "one-way",
       origin: deal.origin,
       destination: deal.destination,
       date: deal.departure_date,
-      returnDate: "",
+      returnDate: deal.return_date ?? "",
       origin2: "",
       destination2: "",
       date2: "",

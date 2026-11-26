@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   countryName,
+  formatDay,
   formatDuration,
   formatPrice,
   placeLabel,
@@ -61,6 +62,10 @@ export function DealItem({ deal, onSeeFlights }: Props) {
   const fromSecondary = secondaryAirport(from);
   const toSecondary = secondaryAirport(to);
   const name = title(to);
+  // "12 Jan – 19 Jan" for a round trip, "12 Jan" for a one-way deal.
+  const dates = deal.return_date
+    ? `${formatDay(deal.departure_date)} – ${formatDay(deal.return_date)}`
+    : formatDay(deal.departure_date);
 
   return (
     <li className="deal-card">
@@ -80,9 +85,10 @@ export function DealItem({ deal, onSeeFlights }: Props) {
         )}
         <span className="deal-price">
           <small>from</small> {formatPrice(deal.price, deal.currency)}
+          <small className="deal-kind">{deal.return_date ? "· round trip" : "· one way"}</small>
         </span>
         <span className="deal-meta">
-          {deal.departure_date} · {deal.airline}
+          {dates} · {deal.airline}
           {deal.total_duration_minutes ? ` · ${formatDuration(deal.total_duration_minutes)}` : ""}
         </span>
         {onSeeFlights && deal.origin && (

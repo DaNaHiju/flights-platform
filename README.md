@@ -84,7 +84,7 @@ shared/                       Code shared by api and worker (imported as shared.
 └── config.py                 Shared settings, require_env()
 services/
 ├── api/                      FastAPI: /flights, /locations, /deals, /bookings, probes, /metrics
-├── worker/                   refresh_deals: cheapest offer per popular route → Redis
+├── worker/                   refresh_deals: cheapest round trip per popular route → Redis
 └── web/                      React + Vite, served by nginx-unprivileged
 docs/api-contract.md          Endpoints, schemas, env vars, error codes
 ```
