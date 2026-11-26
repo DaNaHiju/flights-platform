@@ -52,6 +52,15 @@ A search, step by step:
    the airline **deep link**.
 5. "Book" opens the deep link: the purchase happens on the airline's own site.
 
+Everything after step 4 happens in the browser, on the offers already returned
+(no extra API calls). Each step's list can be sorted with the tabs (Best,
+Cheapest, Fastest) or the **Sort by** menu: Best, Price, Duration, Departure
+time, Arrival time and Stops. Price and Duration are the Cheapest and Fastest
+tabs, so both controls always agree. Departure and arrival are the **local**
+clock time of the API's string, never converted, of the flight that step shows
+(the return flight in the return step). Stops puts nonstop first and breaks ties
+by price.
+
 ### Layout
 
 ```

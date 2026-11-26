@@ -1,7 +1,8 @@
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useId, useMemo, useState, type ReactNode } from "react";
 import { formatPrice } from "./format";
-import { dedupe, PAGE_SIZE, sortRanked, type Ranked, type SortKey } from "./results";
+import { dedupe, PAGE_SIZE, SORT_OPTIONS, sortRanked, type Ranked, type SortKey } from "./results";
 
+// The three quick tabs; the "Sort by" menu offers them too, plus three more.
 const TABS: { key: SortKey; label: string }[] = [
   { key: "best", label: "Best" },
   { key: "cheapest", label: "Cheapest" },
@@ -16,11 +17,13 @@ interface Props<T> {
 }
 
 // Duplicates removed, a Best / Cheapest / Fastest tab bar (each tab shows the
-// price of the offer that leads that view), "N results", and the first
-// PAGE_SIZE rows with a "Show more" button for the rest.
+// price of the offer that leads that view), a "Sort by" menu that shares its
+// state with the tabs, "N results", and the first PAGE_SIZE rows with a
+// "Show more" button for the rest.
 export function ResultsList<T>({ results, renderRow, label = "Flight results" }: Props<T>) {
   const [sort, setSort] = useState<SortKey>("best");
   const [shown, setShown] = useState(PAGE_SIZE);
+  const sortId = useId();
 
   const unique = useMemo(() => dedupe(results), [results]);
   const sorted = useMemo(() => {
@@ -30,26 +33,31 @@ export function ResultsList<T>({ results, renderRow, label = "Flight results" }:
       fastest: sortRanked(unique, "fastest"),
     };
   }, [unique]);
+  const list = useMemo(
+    () => (sort in sorted ? sorted[sort as keyof typeof sorted] : sortRanked(unique, sort)),
+    [sort, sorted, unique],
+  );
 
   if (unique.length === 0) return null;
-  const list = sorted[sort];
+
+  function changeSort(key: SortKey) {
+    setSort(key);
+    setShown(PAGE_SIZE);
+  }
 
   return (
     <div className="results-list">
       <div className="sort-bar">
         <div className="sort-tabs" role="group" aria-label={`Sort ${label}`}>
           {TABS.map(({ key, label: text }) => {
-            const lead = sorted[key][0];
+            const lead = sorted[key as keyof typeof sorted][0];
             return (
               <button
                 key={key}
                 type="button"
                 className="sort-tab"
                 aria-pressed={sort === key}
-                onClick={() => {
-                  setSort(key);
-                  setShown(PAGE_SIZE);
-                }}
+                onClick={() => changeSort(key)}
               >
                 <span>{text}</span>
                 <small>{formatPrice(lead.price, lead.currency)}</small>
@@ -57,6 +65,16 @@ export function ResultsList<T>({ results, renderRow, label = "Flight results" }:
             );
           })}
         </div>
+        <label className="sort-select" htmlFor={sortId}>
+          Sort by
+          <select id={sortId} value={sort} onChange={(e) => changeSort(e.target.value as SortKey)}>
+            {SORT_OPTIONS.map(({ key, label: text }) => (
+              <option key={key} value={key}>
+                {text}
+              </option>
+            ))}
+          </select>
+        </label>
         <p className="result-count">
           {unique.length} result{unique.length === 1 ? "" : "s"}
         </p>

@@ -1,7 +1,19 @@
 // Pure logic for the result list: duplicates, ordering and paging. No React here.
+import { localMinutes } from "./format";
 import type { FlightOffer, RoundTripOffer } from "./types";
 
-export type SortKey = "best" | "cheapest" | "fastest";
+export type SortKey = "best" | "cheapest" | "fastest" | "departure" | "arrival" | "stops";
+
+// The "Sort by" menu. The first three are also the tabs: "Price" is the
+// Cheapest tab and "Duration" the Fastest one, so both controls share one state.
+export const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "best", label: "Best" },
+  { key: "cheapest", label: "Price" },
+  { key: "fastest", label: "Duration" },
+  { key: "departure", label: "Departure time" },
+  { key: "arrival", label: "Arrival time" },
+  { key: "stops", label: "Stops" },
+];
 
 /** What the list needs to know about one result, one way or round trip. */
 export interface Ranked<T> {
@@ -12,6 +24,11 @@ export interface Ranked<T> {
   currency: string;
   duration: number;
   stops: number;
+  // Local departure of the first flight and local arrival of the last one of the
+  // leg this step shows (the return, in the return step), as the API sent them.
+  // Null when the offer has no legs.
+  departure: string | null;
+  arrival: string | null;
   // Same signature = same flights. Null when the offer has no legs to compare.
   signature: string | null;
 }
@@ -26,6 +43,15 @@ export function offerSignature(offer: FlightOffer): string | null {
   return offer.legs.map((leg) => `${leg.flight_number}@${leg.departure_datetime}`).join("|");
 }
 
+// First departure and last arrival of one direction.
+function endpoints(offer: FlightOffer): { departure: string | null; arrival: string | null } {
+  const legs = offer.legs;
+  return {
+    departure: legs[0]?.departure_datetime ?? null,
+    arrival: legs[legs.length - 1]?.arrival_datetime ?? null,
+  };
+}
+
 export function rankOneWay(offer: FlightOffer): Ranked<FlightOffer> {
   return {
     item: offer,
@@ -34,6 +60,7 @@ export function rankOneWay(offer: FlightOffer): Ranked<FlightOffer> {
     currency: offer.currency,
     duration: totalMinutes(offer),
     stops: offer.stops,
+    ...endpoints(offer),
     signature: offerSignature(offer),
   };
 }
@@ -48,6 +75,7 @@ export function rankRoundTrip(offer: RoundTripOffer): Ranked<RoundTripOffer> {
     currency: offer.currency,
     duration: totalMinutes(offer.outbound) + totalMinutes(offer.return),
     stops: offer.outbound.stops + offer.return.stops,
+    ...endpoints(offer.outbound),
     signature: out && back ? `${out}||${back}` : null,
   };
 }
@@ -81,7 +109,10 @@ export function bestScore(r: Ranked<unknown>, minPrice: number, minDuration: num
   return r.price / minPrice + r.duration / minDuration + 0.25 * r.stops;
 }
 
-/** A new array ordered for the tab; ties fall back to the other criterion. */
+// Local clock of a departure/arrival; a missing one sorts last.
+const clock = (iso: string | null): number => (iso === null ? Infinity : localMinutes(iso));
+
+/** A new array in the order of *key*; ties fall back to the price (or the duration). */
 export function sortRanked<T>(list: Ranked<T>[], key: SortKey): Ranked<T>[] {
   const minPrice = Math.min(...list.map((r) => r.price));
   const minDuration = Math.min(...list.map((r) => r.duration));
@@ -89,6 +120,10 @@ export function sortRanked<T>(list: Ranked<T>[], key: SortKey): Ranked<T>[] {
     best: (r) => [bestScore(r, minPrice, minDuration), r.price],
     cheapest: (r) => [r.price, r.duration],
     fastest: (r) => [r.duration, r.price],
+    departure: (r) => [clock(r.departure), r.price],
+    arrival: (r) => [clock(r.arrival), r.price],
+    // Fewest stops first; among equals, the cheapest.
+    stops: (r) => [r.stops, r.price],
   };
   return [...list].sort((a, b) => {
     const x = by[key](a);
@@ -148,6 +183,7 @@ export function rankGroup(group: OutboundGroup): Ranked<OutboundGroup> {
     currency: group.currency,
     duration: totalMinutes(group.outbound),
     stops: group.outbound.stops,
+    ...endpoints(group.outbound),
     signature: null,
   };
 }
@@ -161,6 +197,7 @@ export function rankReturn(pair: RoundTripOffer): Ranked<RoundTripOffer> {
     currency: pair.currency,
     duration: totalMinutes(pair.return),
     stops: pair.return.stops,
+    ...endpoints(pair.return),
     signature: null,
   };
 }

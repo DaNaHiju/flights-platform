@@ -796,6 +796,25 @@ h3 {
   color: #d6efee;
 }
 
+.sort-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.sort-select select {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+  font: inherit;
+  font-weight: 600;
+  color: var(--navy);
+}
+
 .result-count {
   margin: 0;
   font-size: 13px;
