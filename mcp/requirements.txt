@@ -1,0 +1,4 @@
+# Runtime dependencies of the Brisa MCP server (runs locally, no Docker image).
+# mcp 1.x on purpose: the brief asks for FastMCP, which mcp 2.x renamed to MCPServer.
+mcp==1.30.0
+httpx==0.29.0

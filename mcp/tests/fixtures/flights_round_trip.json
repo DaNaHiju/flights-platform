@@ -1,0 +1,478 @@
+{
+ "results": [
+  {
+   "price": 4693.0,
+   "currency": "ILS",
+   "merchant": "EY",
+   "deep_link": "https://example.test/book/951957ca0548279b904d5ed3-out",
+   "outbound": {
+    "offer_id": "951957ca0548279b904d5ed3-out",
+    "price": 4693.0,
+    "currency": "ILS",
+    "duration_minutes": 855,
+    "total_duration_minutes": 855,
+    "stops": 1,
+    "primary_airline": "Etihad Airways",
+    "primary_airline_code": "EY",
+    "carriers": [
+     "Etihad Airways"
+    ],
+    "merchant": "EY",
+    "deep_link": "https://example.test/book/951957ca0548279b904d5ed3-out",
+    "checked_bags": [
+     {
+      "type": "weight",
+      "quantity": null,
+      "weight_amount": 0,
+      "weight_unit": "KG",
+      "applicable_legs": [
+       1,
+       2
+      ]
+     }
+    ],
+    "legs": [
+     {
+      "airline": "Etihad Airways",
+      "airline_code": "EY",
+      "flight_number": "EY608",
+      "operating_airline": null,
+      "departure_airport": "Ben Gurion International Airport",
+      "arrival_airport": "Abu Dhabi International Airport",
+      "departure_datetime": "2027-01-20T14:25:00+02:00",
+      "arrival_datetime": "2027-01-20T19:25:00+04:00",
+      "duration_minutes": 180,
+      "departure_airport_code": "TLV",
+      "arrival_airport_code": "AUH",
+      "departure_city": "Tel Aviv",
+      "arrival_city": "Abu Dhabi",
+      "departure_country_code": "IL",
+      "arrival_country_code": "AE"
+     },
+     {
+      "airline": "Etihad Airways",
+      "airline_code": "EY",
+      "flight_number": "EY800",
+      "operating_airline": null,
+      "departure_airport": "Abu Dhabi International Airport",
+      "arrival_airport": "Narita International Airport",
+      "departure_datetime": "2027-01-20T21:05:00+04:00",
+      "arrival_datetime": "2027-01-21T11:40:00+09:00",
+      "duration_minutes": 575,
+      "departure_airport_code": "AUH",
+      "arrival_airport_code": "NRT",
+      "departure_city": "Abu Dhabi",
+      "arrival_city": "Tokyo",
+      "departure_country_code": "AE",
+      "arrival_country_code": "JP"
+     }
+    ]
+   },
+   "return": {
+    "offer_id": "951957ca0548279b904d5ed3-ret",
+    "price": 4693.0,
+    "currency": "ILS",
+    "duration_minutes": 1090,
+    "total_duration_minutes": 1090,
+    "stops": 1,
+    "primary_airline": "Etihad Airways",
+    "primary_airline_code": "EY",
+    "carriers": [
+     "Etihad Airways"
+    ],
+    "merchant": "EY",
+    "deep_link": "https://example.test/book/951957ca0548279b904d5ed3-ret",
+    "checked_bags": [
+     {
+      "type": "weight",
+      "quantity": null,
+      "weight_amount": 0,
+      "weight_unit": "KG",
+      "applicable_legs": [
+       1,
+       2
+      ]
+     }
+    ],
+    "legs": [
+     {
+      "airline": "Etihad Airways",
+      "airline_code": "EY",
+      "flight_number": "EY801",
+      "operating_airline": null,
+      "departure_airport": "Narita International Airport",
+      "arrival_airport": "Abu Dhabi International Airport",
+      "departure_datetime": "2027-01-30T17:20:00+09:00",
+      "arrival_datetime": "2027-01-31T00:40:00+04:00",
+      "duration_minutes": 740,
+      "departure_airport_code": "NRT",
+      "arrival_airport_code": "AUH",
+      "departure_city": "Tokyo",
+      "arrival_city": "Abu Dhabi",
+      "departure_country_code": "JP",
+      "arrival_country_code": "AE"
+     },
+     {
+      "airline": "Etihad Airways",
+      "airline_code": "EY",
+      "flight_number": "EY609",
+      "operating_airline": null,
+      "departure_airport": "Abu Dhabi International Airport",
+      "arrival_airport": "Ben Gurion International Airport",
+      "departure_datetime": "2027-01-31T02:45:00+04:00",
+      "arrival_datetime": "2027-01-31T04:30:00+02:00",
+      "duration_minutes": 225,
+      "departure_airport_code": "AUH",
+      "arrival_airport_code": "TLV",
+      "departure_city": "Abu Dhabi",
+      "arrival_city": "Tel Aviv",
+      "departure_country_code": "AE",
+      "arrival_country_code": "IL"
+     }
+    ]
+   }
+  },
+  {
+   "price": 4340.0,
+   "currency": "ILS",
+   "merchant": "QR",
+   "deep_link": "https://example.test/book/4df236d133eaf5e71d83e16f-out",
+   "outbound": {
+    "offer_id": "4df236d133eaf5e71d83e16f-out",
+    "price": 4340.0,
+    "currency": "ILS",
+    "duration_minutes": 1415,
+    "total_duration_minutes": 1415,
+    "stops": 2,
+    "primary_airline": "Aegean Airlines",
+    "primary_airline_code": "A3",
+    "carriers": [
+     "Aegean Airlines",
+     "Qatar Airways"
+    ],
+    "merchant": "QR",
+    "deep_link": "https://example.test/book/4df236d133eaf5e71d83e16f-out",
+    "checked_bags": [
+     {
+      "type": "weight",
+      "quantity": null,
+      "weight_amount": 25,
+      "weight_unit": "KG",
+      "applicable_legs": [
+       1,
+       2,
+       3
+      ]
+     }
+    ],
+    "legs": [
+     {
+      "airline": "Aegean Airlines",
+      "airline_code": "A3",
+      "flight_number": "A3929",
+      "operating_airline": null,
+      "departure_airport": "Ben Gurion International Airport",
+      "arrival_airport": "Eleftherios Venizelos International Airport",
+      "departure_datetime": "2027-01-20T05:20:00+02:00",
+      "arrival_datetime": "2027-01-20T07:30:00+02:00",
+      "duration_minutes": 130,
+      "departure_airport_code": "TLV",
+      "arrival_airport_code": "ATH",
+      "departure_city": "Tel Aviv",
+      "arrival_city": "Athens",
+      "departure_country_code": "IL",
+      "arrival_country_code": "GR"
+     },
+     {
+      "airline": "Qatar Airways",
+      "airline_code": "QR",
+      "flight_number": "QR204",
+      "operating_airline": null,
+      "departure_airport": "Eleftherios Venizelos International Airport",
+      "arrival_airport": "Hamad International Airport",
+      "departure_datetime": "2027-01-20T13:20:00+02:00",
+      "arrival_datetime": "2027-01-20T18:30:00+03:00",
+      "duration_minutes": 250,
+      "departure_airport_code": "ATH",
+      "arrival_airport_code": "DOH",
+      "departure_city": "Athens",
+      "arrival_city": "Doha",
+      "departure_country_code": "GR",
+      "arrival_country_code": "QA"
+     },
+     {
+      "airline": "Qatar Airways",
+      "airline_code": "QR",
+      "flight_number": "QR808",
+      "operating_airline": null,
+      "departure_airport": "Hamad International Airport",
+      "arrival_airport": "Narita International Airport",
+      "departure_datetime": "2027-01-20T20:15:00+03:00",
+      "arrival_datetime": "2027-01-21T11:55:00+09:00",
+      "duration_minutes": 580,
+      "departure_airport_code": "DOH",
+      "arrival_airport_code": "NRT",
+      "departure_city": "Doha",
+      "arrival_city": "Tokyo",
+      "departure_country_code": "QA",
+      "arrival_country_code": "JP"
+     }
+    ]
+   },
+   "return": {
+    "offer_id": "4df236d133eaf5e71d83e16f-ret",
+    "price": 4340.0,
+    "currency": "ILS",
+    "duration_minutes": 1440,
+    "total_duration_minutes": 1440,
+    "stops": 2,
+    "primary_airline": "Qatar Airways",
+    "primary_airline_code": "QR",
+    "carriers": [
+     "Qatar Airways",
+     "Cyprus Airways"
+    ],
+    "merchant": "QR",
+    "deep_link": "https://example.test/book/4df236d133eaf5e71d83e16f-ret",
+    "checked_bags": [
+     {
+      "type": "weight",
+      "quantity": null,
+      "weight_amount": 25,
+      "weight_unit": "KG",
+      "applicable_legs": [
+       1,
+       2,
+       3
+      ]
+     }
+    ],
+    "legs": [
+     {
+      "airline": "Qatar Airways",
+      "airline_code": "QR",
+      "flight_number": "QR807",
+      "operating_airline": null,
+      "departure_airport": "Narita International Airport",
+      "arrival_airport": "Hamad International Airport",
+      "departure_datetime": "2027-01-30T21:55:00+09:00",
+      "arrival_datetime": "2027-01-31T04:40:00+03:00",
+      "duration_minutes": 765,
+      "departure_airport_code": "NRT",
+      "arrival_airport_code": "DOH",
+      "departure_city": "Tokyo",
+      "arrival_city": "Doha",
+      "departure_country_code": "JP",
+      "arrival_country_code": "QA"
+     },
+     {
+      "airline": "Qatar Airways",
+      "airline_code": "QR",
+      "flight_number": "QR265",
+      "operating_airline": null,
+      "departure_airport": "Hamad International Airport",
+      "arrival_airport": "Larnaca International Airport",
+      "departure_datetime": "2027-01-31T08:15:00+03:00",
+      "arrival_datetime": "2027-01-31T11:00:00+02:00",
+      "duration_minutes": 225,
+      "departure_airport_code": "DOH",
+      "arrival_airport_code": "LCA",
+      "departure_city": "Doha",
+      "arrival_city": "Larnaca",
+      "departure_country_code": "QA",
+      "arrival_country_code": "CY"
+     },
+     {
+      "airline": "Cyprus Airways",
+      "airline_code": "CY",
+      "flight_number": "CY110",
+      "operating_airline": null,
+      "departure_airport": "Larnaca International Airport",
+      "arrival_airport": "Ben Gurion International Airport",
+      "departure_datetime": "2027-01-31T13:55:00+02:00",
+      "arrival_datetime": "2027-01-31T14:55:00+02:00",
+      "duration_minutes": 60,
+      "departure_airport_code": "LCA",
+      "arrival_airport_code": "TLV",
+      "departure_city": "Larnaca",
+      "arrival_city": "Tel Aviv",
+      "departure_country_code": "CY",
+      "arrival_country_code": "IL"
+     }
+    ]
+   }
+  },
+  {
+   "price": 4407.0,
+   "currency": "ILS",
+   "merchant": "QR",
+   "deep_link": "https://example.test/book/66962008f8b9779de1693da1-out",
+   "outbound": {
+    "offer_id": "66962008f8b9779de1693da1-out",
+    "price": 4407.0,
+    "currency": "ILS",
+    "duration_minutes": 1415,
+    "total_duration_minutes": 1415,
+    "stops": 2,
+    "primary_airline": "Aegean Airlines",
+    "primary_airline_code": "A3",
+    "carriers": [
+     "Aegean Airlines",
+     "Qatar Airways"
+    ],
+    "merchant": "QR",
+    "deep_link": "https://example.test/book/66962008f8b9779de1693da1-out",
+    "checked_bags": [
+     {
+      "type": "weight",
+      "quantity": null,
+      "weight_amount": 25,
+      "weight_unit": "KG",
+      "applicable_legs": [
+       1,
+       2,
+       3
+      ]
+     }
+    ],
+    "legs": [
+     {
+      "airline": "Aegean Airlines",
+      "airline_code": "A3",
+      "flight_number": "A3929",
+      "operating_airline": null,
+      "departure_airport": "Ben Gurion International Airport",
+      "arrival_airport": "Eleftherios Venizelos International Airport",
+      "departure_datetime": "2027-01-20T05:20:00+02:00",
+      "arrival_datetime": "2027-01-20T07:30:00+02:00",
+      "duration_minutes": 130,
+      "departure_airport_code": "TLV",
+      "arrival_airport_code": "ATH",
+      "departure_city": "Tel Aviv",
+      "arrival_city": "Athens",
+      "departure_country_code": "IL",
+      "arrival_country_code": "GR"
+     },
+     {
+      "airline": "Qatar Airways",
+      "airline_code": "QR",
+      "flight_number": "QR204",
+      "operating_airline": null,
+      "departure_airport": "Eleftherios Venizelos International Airport",
+      "arrival_airport": "Hamad International Airport",
+      "departure_datetime": "2027-01-20T13:20:00+02:00",
+      "arrival_datetime": "2027-01-20T18:30:00+03:00",
+      "duration_minutes": 250,
+      "departure_airport_code": "ATH",
+      "arrival_airport_code": "DOH",
+      "departure_city": "Athens",
+      "arrival_city": "Doha",
+      "departure_country_code": "GR",
+      "arrival_country_code": "QA"
+     },
+     {
+      "airline": "Qatar Airways",
+      "airline_code": "QR",
+      "flight_number": "QR808",
+      "operating_airline": null,
+      "departure_airport": "Hamad International Airport",
+      "arrival_airport": "Narita International Airport",
+      "departure_datetime": "2027-01-20T20:15:00+03:00",
+      "arrival_datetime": "2027-01-21T11:55:00+09:00",
+      "duration_minutes": 580,
+      "departure_airport_code": "DOH",
+      "arrival_airport_code": "NRT",
+      "departure_city": "Doha",
+      "arrival_city": "Tokyo",
+      "departure_country_code": "QA",
+      "arrival_country_code": "JP"
+     }
+    ]
+   },
+   "return": {
+    "offer_id": "66962008f8b9779de1693da1-ret",
+    "price": 4407.0,
+    "currency": "ILS",
+    "duration_minutes": 1740,
+    "total_duration_minutes": 1740,
+    "stops": 2,
+    "primary_airline": "Qatar Airways",
+    "primary_airline_code": "QR",
+    "carriers": [
+     "Qatar Airways",
+     "Cyprus Airways"
+    ],
+    "merchant": "QR",
+    "deep_link": "https://example.test/book/66962008f8b9779de1693da1-ret",
+    "checked_bags": [
+     {
+      "type": "weight",
+      "quantity": null,
+      "weight_amount": 30,
+      "weight_unit": "KG",
+      "applicable_legs": [
+       1,
+       2,
+       3
+      ]
+     }
+    ],
+    "legs": [
+     {
+      "airline": "Qatar Airways",
+      "airline_code": "QR",
+      "flight_number": "QR809",
+      "operating_airline": null,
+      "departure_airport": "Narita International Airport",
+      "arrival_airport": "Hamad International Airport",
+      "departure_datetime": "2027-01-30T16:55:00+09:00",
+      "arrival_datetime": "2027-01-30T23:40:00+03:00",
+      "duration_minutes": 765,
+      "departure_airport_code": "NRT",
+      "arrival_airport_code": "DOH",
+      "departure_city": "Tokyo",
+      "arrival_city": "Doha",
+      "departure_country_code": "JP",
+      "arrival_country_code": "QA"
+     },
+     {
+      "airline": "Qatar Airways",
+      "airline_code": "QR",
+      "flight_number": "QR265",
+      "operating_airline": null,
+      "departure_airport": "Hamad International Airport",
+      "arrival_airport": "Larnaca International Airport",
+      "departure_datetime": "2027-01-31T08:15:00+03:00",
+      "arrival_datetime": "2027-01-31T11:00:00+02:00",
+      "duration_minutes": 225,
+      "departure_airport_code": "DOH",
+      "arrival_airport_code": "LCA",
+      "departure_city": "Doha",
+      "arrival_city": "Larnaca",
+      "departure_country_code": "QA",
+      "arrival_country_code": "CY"
+     },
+     {
+      "airline": "Cyprus Airways",
+      "airline_code": "CY",
+      "flight_number": "CY110",
+      "operating_airline": null,
+      "departure_airport": "Larnaca International Airport",
+      "arrival_airport": "Ben Gurion International Airport",
+      "departure_datetime": "2027-01-31T13:55:00+02:00",
+      "arrival_datetime": "2027-01-31T14:55:00+02:00",
+      "duration_minutes": 60,
+      "departure_airport_code": "LCA",
+      "arrival_airport_code": "TLV",
+      "departure_city": "Larnaca",
+      "arrival_city": "Tel Aviv",
+      "departure_country_code": "CY",
+      "arrival_country_code": "IL"
+     }
+    ]
+   }
+  }
+ ],
+ "cached": false,
+ "cached_at": null
+}

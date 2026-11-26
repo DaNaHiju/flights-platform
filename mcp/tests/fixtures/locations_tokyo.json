@@ -1,0 +1,52 @@
+{
+ "results": [
+  {
+   "id": "CTYO",
+   "iata_code": "TYO",
+   "sub_type": "CITY",
+   "name": "Tokyo",
+   "detailed_name": "TOKYO/JP",
+   "city_name": "Tokyo",
+   "city_code": "TYO",
+   "country_name": "Japan",
+   "country_code": "JP",
+   "search_code": "TYO"
+  },
+  {
+   "id": "AHND",
+   "iata_code": "HND",
+   "sub_type": "AIRPORT",
+   "name": "Tokyo Intl Haneda",
+   "detailed_name": "TOKYO/JP:TOKYO INTL HANEDA",
+   "city_name": "Tokyo",
+   "city_code": "TYO",
+   "country_name": "Japan",
+   "country_code": "JP",
+   "search_code": "HND+"
+  },
+  {
+   "id": "ANRT",
+   "iata_code": "NRT",
+   "sub_type": "AIRPORT",
+   "name": "Narita Intl",
+   "detailed_name": "TOKYO/JP:NARITA INTL",
+   "city_name": "Tokyo",
+   "city_code": "TYO",
+   "country_name": "Japan",
+   "country_code": "JP",
+   "search_code": "NRT+"
+  },
+  {
+   "id": "AOKO",
+   "iata_code": "OKO",
+   "sub_type": "AIRPORT",
+   "name": "Yokota Ab",
+   "detailed_name": "TOKYO/JP:YOKOTA AB",
+   "city_name": "Tokyo",
+   "city_code": "TYO",
+   "country_name": "Japan",
+   "country_code": "JP",
+   "search_code": "OKO+"
+  }
+ ]
+}
