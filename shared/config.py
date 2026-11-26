@@ -73,6 +73,15 @@ class SharedSettings:
         os.getenv("AMADEUS_MAX_RESULTS_PER_MERCHANT", "20")
     )
 
+    # --- Destination photos ---------------------------------------------------
+    # Pixabay API key: a secret, optional like the Amadeus one. Without it the
+    # service starts and GET /destination-image answers {"available": false}.
+    PIXABAY_API_KEY: str | None = os.getenv("PIXABAY_API_KEY") or None
+    PIXABAY_GATEWAY_URL: str = os.getenv("PIXABAY_GATEWAY_URL", "https://pixabay.com")
+    # Pixabay's terms ask for at least 24 h; a photo of a place does not change,
+    # so it is kept 30 days.
+    DESTINATION_IMAGE_TTL: int = int(os.getenv("DESTINATION_IMAGE_TTL", str(30 * 86400)))
+
     # Reference data barely changes, so lookups are cached far longer than
     # searches: airline names for 7 days, airport/city typeahead for 1 day.
     AIRLINES_CACHE_TTL: int = int(os.getenv("AIRLINES_CACHE_TTL", "604800"))
