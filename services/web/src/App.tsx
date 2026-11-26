@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, listDeals, searchFlights, searchRoundTrip } from "./api";
 import { DealItem } from "./DealItem";
+import { DestinationBanner } from "./DestinationPhoto";
+import { destinationOf, dealPlace } from "./destination";
 import { PlaneIcon } from "./Icons";
 import { MultiCityFlow, NO_FLIGHTS_MESSAGE, OneWayFlow, RoundTripFlow, type LegSearch } from "./Flows";
 import { SearchForm, type Prefill } from "./SearchForm";
@@ -32,6 +34,18 @@ type Results =
   | { kind: "one-way"; query: SearchQuery; offers: FlightOffer[] }
   | { kind: "round-trip"; query: SearchQuery; offers: RoundTripOffer[] }
   | { kind: "multi-city"; legs: LegSearch[]; adults: number };
+
+// The photo strip above the results: the place the user searched for.
+function ResultsBanner({
+  query,
+  offers,
+}: {
+  query: SearchQuery;
+  offers: (FlightOffer | RoundTripOffer)[];
+}) {
+  const place = destinationOf(query, offers);
+  return place ? <DestinationBanner place={place} /> : null;
+}
 
 function Brand({ footer = false }: { footer?: boolean }) {
   return (
@@ -130,6 +144,7 @@ export default function App() {
       origin2: "",
       destination2: "",
       date2: "",
+      destinationPlace: dealPlace(deal) ?? undefined,
     });
   }
 
@@ -172,6 +187,9 @@ export default function App() {
         {showResults && (
           <section className="section-block results" id="results" ref={resultsRef}>
             <div className="wrap">
+              {(results?.kind === "one-way" || results?.kind === "round-trip") && (
+                <ResultsBanner query={results.query} offers={results.offers} />
+              )}
               <p className="section-kicker">Your search</p>
               <h2>Flights</h2>
 

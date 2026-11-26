@@ -9,7 +9,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.api import bookings, deals, flights, locations
+from app.api import bookings, deals, destination_images, flights, locations
 from app.config import settings
 from app.database import create_tables, get_db
 from app.utils.metrics import request_count, request_duration
@@ -125,3 +125,6 @@ app.include_router(flights.router, prefix="/flights", tags=["flights"])
 app.include_router(locations.router, prefix="/locations", tags=["locations"])
 app.include_router(deals.router, prefix="/deals", tags=["deals"])
 app.include_router(bookings.router, prefix="/bookings", tags=["bookings"])
+app.include_router(
+    destination_images.router, prefix="/destination-image", tags=["destination-image"]
+)

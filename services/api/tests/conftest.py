@@ -16,9 +16,10 @@ from sqlalchemy.orm import sessionmaker
 SQLALCHEMY_TEST_URL = "sqlite:///./test.db"
 os.environ["DATABASE_URL"] = SQLALCHEMY_TEST_URL
 os.environ["REDIS_URL"] = "redis://redis.invalid:6379/0"
-# Removed so no test can ever reach the real Amadeus gateway, even when a
+# Removed so no test can ever reach the real Amadeus or Pixabay, even when a
 # developer has a real key exported in their shell.
 os.environ.pop("AMADEUS_API_KEY", None)
+os.environ.pop("PIXABAY_API_KEY", None)
 
 from shared import cache  # noqa: E402
 from app.database import Base, get_db  # noqa: E402

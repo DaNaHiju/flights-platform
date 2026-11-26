@@ -77,6 +77,9 @@ The browser never calls Amadeus and never sees the API key.
 | `AMADEUS_SEARCH_TIMEOUT_SECONDS` | ConfigMap | 25 | flight search read timeout |
 | `AMADEUS_LOOKUP_TIMEOUT_SECONDS` | ConfigMap | 5 | airlines / locations read timeout |
 | `AMADEUS_MAX_RESULTS_PER_MERCHANT` | ConfigMap | 20 | `number_of_results` per airline |
+| `PIXABAY_API_KEY` | Secret (ExternalSecret `<release>-pixabay`) | unset | **secret**; optional: unset → `GET /destination-image` answers `available: false` (api only) |
+| `PIXABAY_GATEWAY_URL` | ConfigMap | `https://pixabay.com` | |
+| `DESTINATION_IMAGE_TTL` | ConfigMap | 2592000 | seconds (30 days); a place with no photo is cached 7 days, not configurable |
 | `FLIGHTS_PROVIDER` | ConfigMap | `amadeus` | provider selector |
 | `FLIGHTS_CURRENCY` | ConfigMap | `USD` | |
 | `FLIGHTS_DEFAULT_ORIGIN` | ConfigMap | `TLV` | worker: origin of the deals |
@@ -227,6 +230,43 @@ query: keyword  1-60 chars (required). Normalized server-side: text before the
 `city_code`, `country_name`, `country_code`, and `search_code`: the value to
 send as origin/destination (`MAD+` for an airport, `MAD` for a city).
 
+### GET /destination-image
+
+A photo of a place, from Pixabay. The backend downloads the image once and
+serves it itself: the browser never talks to Pixabay (no hotlinking).
+
+```
+query: city     1-60 chars (required)
+       country  0-60 chars (optional)
+200 → { "available": true,
+        "url": "/destination-image/file/hanoi_vietnam",   # relative to the API root
+        "credit_user": "Jane",
+        "credit_url": "https://pixabay.com/photos/..." }   # the photo's Pixabay page
+200 → { "available": false, "url": null, "credit_user": null, "credit_url": null }
+400 → { "error": "invalid_destination" }   # city blank
+422 → city missing or too long
+```
+
+`available: false` (always HTTP 200, never a 5xx) covers: no `PIXABAY_API_KEY`,
+no photo for the place, Pixabay rate limit / timeout / error, and Redis down.
+Pixabay requires crediting the photographer: clients must show
+`Photo: <credit_user> on Pixabay` linking to `credit_url` next to the photo.
+
+Search: `q = "<city> <country>"`, then `q = "<country>"` when that finds
+nothing; `category=travel`, then `places`; `image_type=photo`,
+`orientation=horizontal`, `order=popular`, `safesearch=true`, `min_width=1200`,
+`per_page=5`; the first hit is used. Its `largeImageURL` is downloaded
+(rejected over 600 KB, or if not JPEG/PNG/WebP). The key is `city` and `country`
+lower-cased, accents removed, non-alphanumerics replaced by `-`.
+
+### GET /destination-image/file/{key}
+
+```
+200 → the image bytes, with its Content-Type, `Cache-Control: public, max-age=86400`
+404 → { "error": "image_not_found" }   # not in Redis (expired, never fetched, Redis down)
+422 → key is not [a-z0-9_-]{1,100}
+```
+
 ### GET /deals
 
 Always served from Redis; never calls the provider (the CronJob fills it).
@@ -314,13 +354,20 @@ hold the old fli shape; readers must not assume one shape for every row.
 |---|---|---|---|
 | `search:{provider}:{origin}:{dest}:{date}:{adults}:{currency}[:rt:{return}]` | `SEARCH_CACHE_TTL` | flights-api | flights-api |
 | `offer:{offer_id}` | `OFFER_CACHE_TTL` | flights-api | flights-api (bookings) |
-| `airline:{code}` | `AIRLINES_CACHE_TTL` | provider (api, worker) | provider |
+| `airline:v2:{code}` | `AIRLINES_CACHE_TTL` | provider (api, worker) | provider |
+| `destination-image:{key}` | `DESTINATION_IMAGE_TTL` (30 d); 7 d when no photo | flights-api | flights-api |
 | `locations:{keyword}` | `LOCATIONS_CACHE_TTL` | provider (api) | provider |
 | `deals:top` | `DEALS_CACHE_TTL` | worker | flights-api |
 
 - Searches are cached so repeated queries do not spend Amadeus quota.
 - Airline names are resolved in one batched lookup per search for the codes not
-  yet cached; unknown codes are cached as the code so they are not looked up again.
+  yet cached. Redis holds Amadeus's raw `businessName` (`""` for an unknown
+  code, shown as the code) and the display format is applied when it is read, so
+  a formatting change needs no cache flush. `v2` replaced `airline:{code}`, which
+  held already-formatted names; the old keys are never read and expire by TTL.
+- Destination photos: one JSON entry per place with the image base64-encoded
+  (the shared Redis client decodes replies as text), content type and credit.
+  A Pixabay 429, timeout or error is never cached.
 - Errors and empty results are never cached: a merchant that failed looks like "no offers", and caching that would keep answering "no flights" after the provider recovers.
 - Search, airline and location caches are best-effort: Redis being down turns
   them into misses (logged), not failures. `offer:*` stays strict: bookings must

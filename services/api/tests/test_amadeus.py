@@ -158,7 +158,8 @@ def test_airline_names_are_one_batched_call_then_cached(fake_redis):
     lookups = gw.calls(AIRLINES)
     assert len(lookups) == 1
     assert lookups[0].url.params["airlineCodes"] == "LH,LX,LY,UX"
-    assert '"Swiss"' == fake_redis.store["airline:LX"]
+    # The cache holds the raw name; formatting is applied when it is read.
+    assert '"SWISS"' == fake_redis.store["airline:v2:LX"]
 
 
 def test_unknown_airline_code_is_shown_as_code_and_cached():
@@ -469,3 +470,38 @@ def test_checked_bags_appear_in_the_json_the_api_returns():
         {"type": "piece", "quantity": 1, "weight_amount": 23, "weight_unit": "KG", "applicable_legs": [1]}
     ]
     assert FlightOffer.model_validate(dumped) == offer
+
+
+def test_airline_cache_holds_the_raw_name_and_formats_on_read(fake_redis, monkeypatch):
+    gw = FakeGateway().on(
+        AIRLINES,
+        {"data": [{"iataCode": "LY", "icaoCode": "ELY", "businessName": "EL AL ISRAEL AIRLINES"}]},
+    )
+    provider = gw.provider()
+    assert provider.airline_names(["LY"]) == {"LY": "El Al Israel Airlines"}
+    assert fake_redis.store["airline:v2:LY"] == '"EL AL ISRAEL AIRLINES"'
+
+    # A later change to the display format reaches names already in Redis.
+    monkeypatch.setattr("shared.providers.amadeus.display_name", lambda raw: f"<{raw}>")
+    assert provider.airline_names(["LY"]) == {"LY": "<EL AL ISRAEL AIRLINES>"}
+    assert len(gw.calls(AIRLINES)) == 1  # still served from Redis
+
+
+def test_old_airline_entries_are_ignored(fake_redis):
+    # What airline:{code} held before v2: the name already formatted (here, wrongly).
+    fake_redis.store["airline:LY"] = '"Ita Airways"'
+    gw = FakeGateway().on(
+        AIRLINES, {"data": [{"iataCode": "LY", "businessName": "ITA AIRWAYS"}]}
+    )
+    assert gw.provider().airline_names(["LY"]) == {"LY": "ITA Airways"}
+    assert len(gw.calls(AIRLINES)) == 1
+    assert fake_redis.store["airline:LY"] == '"Ita Airways"'  # left alone, expires by TTL
+
+
+def test_unknown_code_is_cached_as_empty_and_read_back_as_the_code(fake_redis):
+    gw = FakeGateway().on(AIRLINES, AIRLINES_RESPONSE)
+    provider = gw.provider()
+    provider.airline_names(["XX"])
+    assert fake_redis.store["airline:v2:XX"] == '""'
+    assert provider.airline_names(["XX"]) == {"XX": "XX"}
+    assert len(gw.calls(AIRLINES)) == 1

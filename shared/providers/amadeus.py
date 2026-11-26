@@ -68,6 +68,11 @@ AIRLINE_CODES_PER_REQUEST = 100
 TYPEAHEAD_RESULTS = 8
 KEYWORD_MAX_LENGTH = 30
 KEYWORD_MIN_LENGTH = 2
+# Redis key prefix of the airline names. v2 stores Amadeus's RAW businessName
+# (v1 stored the already formatted name, so a formatting fix never reached it).
+# Bump the version if the stored shape changes again: old entries are then
+# ignored and expire on their own.
+AIRLINE_CACHE_PREFIX = "airline:v2:"
 
 
 def _query(params: Iterable[tuple[str, str]]) -> str:
@@ -478,9 +483,12 @@ class AmadeusProvider:
         names: dict[str, str] = {}
         missing: list[str] = []
         for code in sorted(set(codes)):
-            cached = try_get_json(f"airline:{code}")
+            cached = try_get_json(f"{AIRLINE_CACHE_PREFIX}{code}")
             if cached is not None:
-                names[code] = cached
+                # The cache holds Amadeus's raw name; formatting happens here,
+                # so a change to display_name shows up without emptying Redis.
+                # "" marks a code Amadeus has no name for: shown as the code.
+                names[code] = display_name(cached) if cached else code
             else:
                 missing.append(code)
         if not missing:
@@ -500,18 +508,18 @@ class AmadeusProvider:
                 names.update({code: names.get(code, code) for code in chunk})
                 continue
 
-            found: dict[str, str] = {}
+            found: dict[str, str] = {}  # code -> raw businessName
             for record in body.get("data") or []:
                 business = record.get("businessName")
                 if not business or business == "UNDEFINED":
                     continue
                 for key in (record.get("iataCode"), record.get("icaoCode")):
                     if key:
-                        found[key.upper()] = display_name(business)
+                        found[key.upper()] = business
             for code in chunk:
-                name = found.get(code, code)
-                names[code] = name
-                try_set_json(f"airline:{code}", name, ttl=self._airlines_ttl)
+                raw = found.get(code, "")
+                names[code] = display_name(raw) if raw else code
+                try_set_json(f"{AIRLINE_CACHE_PREFIX}{code}", raw, ttl=self._airlines_ttl)
         return names
 
     # --- Airport / city typeahead (reference data, cached) -------------------

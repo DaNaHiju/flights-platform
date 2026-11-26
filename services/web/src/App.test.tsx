@@ -546,20 +546,13 @@ describe("deals", () => {
     expect(screen.queryByRole("button", { name: /See flights/ })).toBeNull();
   });
 
-  it("uses the destination photo, lazy, with a descriptive alt, and has no booking link", () => {
+  it("has no booking link, and keeps the gradient while its photo is unavailable", () => {
     render(
       <ul>
         <DealItem deal={full} onSeeFlights={() => {}} />
       </ul>,
     );
-    const img = screen.getByRole("img");
-    expect(img.getAttribute("src")).toBe("/destinations/FCO.webp");
-    expect(img.getAttribute("alt")).toBe("View of Rome, Italy");
-    expect(img.getAttribute("loading")).toBe("lazy");
     expect(screen.queryAllByRole("link", { name: BOOKING })).toHaveLength(0);
-
-    // a missing photo leaves the gradient, without a broken image
-    fireEvent.error(img);
     expect(screen.queryByRole("img")).toBeNull();
   });
 

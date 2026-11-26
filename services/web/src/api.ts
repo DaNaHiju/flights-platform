@@ -1,4 +1,4 @@
-import type { Deal, FlightOffer, Location, RoundTripOffer } from "./types";
+import type { Deal, DestinationImage, FlightOffer, Location, RoundTripOffer } from "./types";
 
 // Same origin: nginx (or the vite dev server) forwards /api/* to flights-api.
 const BASE = "/api";
@@ -84,4 +84,16 @@ export async function searchLocations(
   const query = new URLSearchParams({ keyword });
   const data = await get<{ results: Location[] }>(`/locations?${query}`, signal);
   return data.results;
+}
+
+// The photo of a destination, fetched and cached by the backend. The answer's
+// `url` is API-relative; it is returned already prefixed so it works in an <img>.
+export async function getDestinationImage(
+  city: string,
+  country: string,
+  signal?: AbortSignal,
+): Promise<DestinationImage> {
+  const query = new URLSearchParams({ city, country });
+  const data = await get<DestinationImage>(`/destination-image?${query}`, signal);
+  return data.available && data.url ? { ...data, url: `${BASE}${data.url}` } : data;
 }

@@ -1,12 +1,14 @@
 import { useEffect, useId, useState, type KeyboardEvent } from "react";
 import { searchLocations } from "./api";
-import type { Location } from "./types";
+import type { DestinationPlace, Location } from "./types";
 
 // What the form keeps for one origin/destination box: the text shown, and the
 // code picked from the list (null while the user is still typing).
 export interface AirportValue {
   text: string;
   code: string | null;
+  // The city and country of the picked suggestion; typing clears it.
+  place?: DestinationPlace;
 }
 
 export const EMPTY_AIRPORT: AirportValue = { text: "", code: null };
@@ -77,7 +79,15 @@ export function AirportInput({ label, value, onChange, placeholder }: Props) {
   }, [value.text, value.code]);
 
   function pick(location: Location) {
-    onChange({ text: optionLabel(location), code: location.search_code });
+    onChange({
+      text: optionLabel(location),
+      code: location.search_code,
+      // A CITY suggestion is the city itself; an AIRPORT one names its city.
+      place: {
+        city: location.city_name ?? location.name,
+        country: location.country_name ?? "",
+      },
+    });
     setOpen(false);
   }
 
