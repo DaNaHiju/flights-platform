@@ -29,6 +29,8 @@ export interface Ranked<T> {
   // Null when the offer has no legs.
   departure: string | null;
   arrival: string | null;
+  // Airline names on the leg this step shows, once each, in flying order.
+  airlines: string[];
   // Same signature = same flights. Null when the offer has no legs to compare.
   signature: string | null;
 }
@@ -41,6 +43,14 @@ export function totalMinutes(offer: FlightOffer): number {
 export function offerSignature(offer: FlightOffer): string | null {
   if (offer.legs.length === 0) return null;
   return offer.legs.map((leg) => `${leg.flight_number}@${leg.departure_datetime}`).join("|");
+}
+
+/** Every airline on the given directions, once, in flying order: "ITA Airways, ANA". */
+export function airlinesOf(offers: FlightOffer[]): string[] {
+  const names = offers.flatMap((o) => o.legs.map((leg) => leg.airline));
+  const unique = [...new Set(names.filter(Boolean))];
+  if (unique.length > 0) return unique;
+  return [...new Set(offers.flatMap((o) => o.carriers ?? [o.primary_airline]))];
 }
 
 // First departure and last arrival of one direction.
@@ -61,6 +71,7 @@ export function rankOneWay(offer: FlightOffer): Ranked<FlightOffer> {
     duration: totalMinutes(offer),
     stops: offer.stops,
     ...endpoints(offer),
+    airlines: airlinesOf([offer]),
     signature: offerSignature(offer),
   };
 }
@@ -76,6 +87,7 @@ export function rankRoundTrip(offer: RoundTripOffer): Ranked<RoundTripOffer> {
     duration: totalMinutes(offer.outbound) + totalMinutes(offer.return),
     stops: offer.outbound.stops + offer.return.stops,
     ...endpoints(offer.outbound),
+    airlines: airlinesOf([offer.outbound, offer.return]),
     signature: out && back ? `${out}||${back}` : null,
   };
 }
@@ -132,6 +144,108 @@ export function sortRanked<T>(list: Ranked<T>[], key: SortKey): Ranked<T>[] {
   });
 }
 
+// ── Filters ──────────────────────────────────────────────────────────────────
+// Applied in the browser to the list of the current step. Within one group
+// (stops, airlines, times) an offer needs to match ANY ticked box; across
+// groups it needs to match ALL of them. An untouched group filters nothing.
+
+export type StopsBucket = "0" | "1" | "2+";
+export type TimeBucket = "morning" | "afternoon" | "evening" | "night";
+
+export const STOPS_BUCKETS: { key: StopsBucket; label: string }[] = [
+  { key: "0", label: "Nonstop" },
+  { key: "1", label: "1 stop" },
+  { key: "2+", label: "2+ stops" },
+];
+
+// Local hours [from, to) of the departure.
+export const TIME_BUCKETS: { key: TimeBucket; label: string; from: number; to: number }[] = [
+  { key: "morning", label: "Morning (05–12)", from: 5, to: 12 },
+  { key: "afternoon", label: "Afternoon (12–18)", from: 12, to: 18 },
+  { key: "evening", label: "Evening (18–24)", from: 18, to: 24 },
+  { key: "night", label: "Night (00–05)", from: 0, to: 5 },
+];
+
+export interface Filters {
+  stops: StopsBucket[];
+  airlines: string[];
+  times: TimeBucket[];
+  // Upper bounds; null = no limit. Duration is in hours.
+  maxPrice: number | null;
+  maxDurationHours: number | null;
+}
+
+export const NO_FILTERS: Filters = {
+  stops: [],
+  airlines: [],
+  times: [],
+  maxPrice: null,
+  maxDurationHours: null,
+};
+
+export function stopsBucket(stops: number): StopsBucket {
+  return stops <= 0 ? "0" : stops === 1 ? "1" : "2+";
+}
+
+/** The bucket of a local timestamp ("...T08:30:00+02:00" -> morning), by its own hour. */
+export function timeBucket(iso: string): TimeBucket {
+  const hour = +iso.slice(11, 13);
+  return TIME_BUCKETS.find((b) => hour >= b.from && hour < b.to)!.key;
+}
+
+/** How many filter groups are narrowing the list (for the button badge and Clear). */
+export function activeFilterCount(f: Filters): number {
+  return (
+    (f.stops.length > 0 ? 1 : 0) +
+    (f.airlines.length > 0 ? 1 : 0) +
+    (f.times.length > 0 ? 1 : 0) +
+    (f.maxPrice !== null ? 1 : 0) +
+    (f.maxDurationHours !== null ? 1 : 0)
+  );
+}
+
+export function applyFilters<T>(list: Ranked<T>[], f: Filters): Ranked<T>[] {
+  return list.filter((r) => {
+    if (f.stops.length > 0 && !f.stops.includes(stopsBucket(r.stops))) return false;
+    if (f.airlines.length > 0 && !r.airlines.some((a) => f.airlines.includes(a))) return false;
+    // An offer without a departure time cannot be placed in a time of day.
+    if (f.times.length > 0 && (r.departure === null || !f.times.includes(timeBucket(r.departure)))) {
+      return false;
+    }
+    if (f.maxPrice !== null && r.price > f.maxPrice) return false;
+    if (f.maxDurationHours !== null && r.duration > f.maxDurationHours * 60) return false;
+    return true;
+  });
+}
+
+/** What the panel offers, from the whole (unfiltered) list so the controls stay put. */
+export interface Facets {
+  stopCounts: Record<StopsBucket, number>;
+  airlines: string[];
+  // Whole units, rounded outwards so the cheapest and the priciest both fit.
+  minPrice: number;
+  maxPrice: number;
+  minHours: number;
+  maxHours: number;
+  currency: string;
+}
+
+export function buildFacets<T>(list: Ranked<T>[]): Facets {
+  const stopCounts: Record<StopsBucket, number> = { "0": 0, "1": 0, "2+": 0 };
+  for (const r of list) stopCounts[stopsBucket(r.stops)] += 1;
+  const prices = list.map((r) => r.price);
+  const hours = list.map((r) => r.duration / 60);
+  return {
+    stopCounts,
+    airlines: [...new Set(list.flatMap((r) => r.airlines))].sort((a, b) => a.localeCompare(b)),
+    minPrice: Math.floor(Math.min(...prices)),
+    maxPrice: Math.ceil(Math.max(...prices)),
+    minHours: Math.floor(Math.min(...hours)),
+    maxHours: Math.ceil(Math.max(...hours)),
+    currency: list[0]?.currency ?? "",
+  };
+}
+
 export const PAGE_SIZE = 10;
 
 /** One outbound flight and every round-trip pair that includes it. */
@@ -184,6 +298,7 @@ export function rankGroup(group: OutboundGroup): Ranked<OutboundGroup> {
     duration: totalMinutes(group.outbound),
     stops: group.outbound.stops,
     ...endpoints(group.outbound),
+    airlines: airlinesOf([group.outbound]),
     signature: null,
   };
 }
@@ -198,6 +313,7 @@ export function rankReturn(pair: RoundTripOffer): Ranked<RoundTripOffer> {
     duration: totalMinutes(pair.return),
     stops: pair.return.stops,
     ...endpoints(pair.return),
+    airlines: airlinesOf([pair.return]),
     signature: null,
   };
 }

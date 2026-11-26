@@ -444,7 +444,8 @@ describe("offer details", () => {
     expect(rows().getByText("El Al")).toBeTruthy();
     expect(screen.getByText(/08:00 → 11:00/)).toBeTruthy();
     expect(screen.getByText("6h 20m")).toBeTruthy();
-    expect(screen.getByText("Nonstop")).toBeTruthy();
+    // scoped to the list: the Stops filter has a "Nonstop" option too
+    expect(rows().getByText("Nonstop")).toBeTruthy();
     expect(rows().getByText("one way")).toBeTruthy();
     expect(screen.queryByText(/Ben Gurion International Airport/)).toBeNull();
 

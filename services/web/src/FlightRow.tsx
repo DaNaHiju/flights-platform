@@ -7,7 +7,7 @@ import {
   localTime,
   minutesBetween,
 } from "./format";
-import { totalMinutes } from "./results";
+import { airlinesOf, totalMinutes } from "./results";
 import type { FlightOffer, Leg } from "./types";
 
 // One direction of a trip. A one-way row has one; a round trip has two.
@@ -44,14 +44,6 @@ function layoverPlace(leg: Leg): string {
 // "Ben Gurion International Airport (TLV)"
 function airportLabel(name: string, code?: string | null): string {
   return code ? `${name} (${code})` : name;
-}
-
-/** Every airline on the route, once, in flying order: "ITA Airways, ANA". */
-function airlinesOf(offers: FlightOffer[]): string[] {
-  const names = offers.flatMap((o) => o.legs.map((leg) => leg.airline));
-  const unique = [...new Set(names.filter(Boolean))];
-  if (unique.length > 0) return unique;
-  return [...new Set(offers.flatMap((o) => o.carriers ?? [o.primary_airline]))];
 }
 
 // Airports where the trip changes planes, in order: the arrival of every leg but the last.

@@ -61,6 +61,15 @@ clock time of the API's string, never converted, of the flight that step shows
 (the return flight in the return step). Stops puts nonstop first and breaks ties
 by price.
 
+The same lists can be **filtered**, again without calling the API: a panel on
+the left (the "Filters" button on a phone) with Stops (Nonstop / 1 / 2+, each
+with its count), Airlines, Departure time (local: Morning 05–12, Afternoon
+12–18, Evening 18–24, Night 00–05), Max price and Max duration, plus "Clear
+filters" and "Showing N of M". Inside a group (say, two airlines) an offer needs
+to match any ticked box; across groups it needs to match all of them. Filters
+apply to the flight each step shows, so in the return step they look at the
+return flight. Sorting and "Show more" work on the filtered list.
+
 ### Layout
 
 ```
