@@ -24,6 +24,8 @@ jobs:
     outputs:
       # JSON list of services to build, e.g. ["api","worker","web"] or [].
       services: ${{ steps.list.outputs.services }}
+      # 'true' when mcp/ (the local MCP server, no image) changed: runs the mcp job below.
+      mcp: ${{ steps.filter.outputs.mcp }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -40,6 +42,9 @@ jobs:
               - '.github/workflows/ci.yml'
             web:
               - 'services/web/**'
+              - '.github/workflows/ci.yml'
+            mcp:
+              - 'mcp/**'
               - '.github/workflows/ci.yml'
       - name: List services to build
         id: list
@@ -186,6 +191,32 @@ jobs:
           docker tag "$IMAGE:$TAG" "$ECR_IMAGE:$TAG"
           docker push "$ECR_IMAGE:$TAG"
 
+  # ── mcp/: lint + test only ─────────────────────────────────────────────────
+  # The Brisa MCP server runs on a developer's machine (stdio), so there is no
+  # image to build, scan or deploy: this job is not part of the build matrix.
+  mcp:
+    needs: changes
+    if: needs.changes.outputs.mcp == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            mcp/requirements.txt
+            mcp/requirements-dev.txt
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt ruff==0.17.2
+      - name: Lint
+        run: ruff check .
+      - name: Test
+        run: pytest -q
+
   # ── Point staging at the new images ────────────────────────────────────────
   update-manifests:
     needs: [changes, build]
@@ -281,7 +312,7 @@ jobs:
   # build is a matrix that is skipped when nothing changed, so it cannot be
   # marked required itself. This job always runs and summarises it.
   ci-ok:
-    needs: [changes, build]
+    needs: [changes, build, mcp]
     if: always()
     runs-on: ubuntu-latest
     steps:

@@ -92,6 +92,7 @@ services/
 ├── api/                      FastAPI: /flights, /locations, /deals, /bookings, probes, /metrics
 ├── worker/                   refresh_deals: cheapest round trip per popular route → Redis
 └── web/                      React + Vite, served by nginx-unprivileged
+mcp/                          Local MCP server so Claude can search flights through the API (read-only, stdio, no image)
 docs/api-contract.md          Endpoints, schemas, env vars, error codes
 ```
 
@@ -261,6 +262,15 @@ Full schemas and error codes: [docs/api-contract.md](docs/api-contract.md).
 
 ---
 
+## Use it from Claude (MCP)
+
+`mcp/` is a small read-only [MCP](https://modelcontextprotocol.io) server that lets Claude
+Code or the Claude desktop app search flights through this API (locations, one-way and
+round-trip search, multi-city, deals). It runs locally and is not deployed. Setup and
+registration: [mcp/README.md](mcp/README.md).
+
+---
+
 ## CI/CD
 
 GitHub Flow: short-lived branches, PRs into `main`, ruleset `protect-main`
@@ -268,6 +278,7 @@ requires the `ci-ok` check. CI (`.github/workflows/ci.yml`) builds only the
 services a change touches (`dorny/paths-filter`): lint → test → image build →
 Trivy → push to GHCR on `main` → a GitHub App bumps the image tag in the
 manifests repo → ArgoCD syncs staging.
+`mcp/` has no image: a separate `mcp` job runs ruff and pytest when it changes.
 
 ---
 

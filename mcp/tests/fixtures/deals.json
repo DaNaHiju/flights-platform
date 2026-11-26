@@ -1,0 +1,36 @@
+{
+ "deals": [
+  {
+   "destination": "FCO",
+   "departure_date": "2026-12-26",
+   "price": 437.0,
+   "currency": "ILS",
+   "airline": "Ita Airways",
+   "origin": "TLV",
+   "origin_airport_name": "Ben Gurion International Airport",
+   "origin_city": "Tel Aviv",
+   "origin_country_code": "IL",
+   "destination_airport_name": "Leonardo Da Vinci (Fiumicino) International Airport",
+   "destination_city": "Rome",
+   "destination_country_code": "IT",
+   "total_duration_minutes": 230
+  },
+  {
+   "destination": "MAD",
+   "departure_date": "2027-01-12",
+   "price": 512.0,
+   "currency": "ILS",
+   "airline": "Iberia",
+   "origin": "TLV",
+   "origin_airport_name": "Ben Gurion International Airport",
+   "origin_city": "Tel Aviv",
+   "origin_country_code": "IL",
+   "destination_airport_name": "Leonardo Da Vinci (Fiumicino) International Airport",
+   "destination_city": "Madrid",
+   "destination_country_code": "IT",
+   "total_duration_minutes": 230,
+   "return_date": "2027-01-19"
+  }
+ ],
+ "refreshed_at": "2026-11-26T22:00:46.450710+00:00"
+}
