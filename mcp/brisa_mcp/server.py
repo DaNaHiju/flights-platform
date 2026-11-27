@@ -38,38 +38,51 @@ def build_server(client: BrisaClient) -> FastMCP:
         date: str,
         return_date: str | None = None,
         adults: int = 1,
-        sort: str = "best",
-        limit: int = 10,
+        airlines: int = 4,
+        airline: str | None = None,
     ) -> str:
-        """Search priced flight offers for one way or a round trip and summarise the best ones.
+        """Search priced flight offers for one way or a round trip, grouped by airline.
 
         origin / destination: a search_code from search_locations ("TYO" = a whole city,
         "NRT+" = one airport). If the user gave a place name, call search_locations first.
         date / return_date: YYYY-MM-DD, today or later. Leave return_date empty for one way.
         adults: 1-9; prices are the total for all of them.
-        sort: "best" (balances price, duration and stops; same ranking as the Brisa web app),
-        "cheapest" or "fastest". limit: how many offers to show (max 20).
+        airlines: how many airlines to show, 1-8 (default 4).
+        airline: optional 2-letter IATA airline code ("AI", "EY") to see only that airline.
 
-        Returns a header (how many offers exist and their price range) then, per offer: total
-        price and currency, airlines, departure -> arrival in LOCAL airport time (+N days when it
-        lands later), total duration, each stop with its airport and layover length, checked bags
-        ("unknown" when the airline did not say; that is NOT "no bag") and a deep_link to the
-        airline's booking page. A round trip is priced as one fare and shows both directions.
+        Offers are grouped by airline, or by combination when several fly one trip ("Aegean
+        Airlines + Qatar Airways" is its own group), so one airline with many schedules cannot
+        crowd out the others. Returns a header (offer count, number of airlines, price range),
+        then the first `airlines` groups ordered by their cheapest offer. Each group shows two
+        offers: the cheapest and the fastest (one offer marked "cheapest and fastest" when they
+        coincide). Each offer has the total price and currency, departure -> arrival in LOCAL
+        airport time (+N days when it lands later), total duration, each stop with its airport
+        and layover length, checked bags ("unknown" when the airline did not say; that is NOT
+        "no bag") and a deep_link to the airline's booking page. A last line "N more airlines:
+        X, Y" names the groups that were not shown: when the user asks about one of them, call
+        again with airline set to its IATA code to get its cheapest and fastest offers.
+        A round trip is priced as one fare and shows both directions.
         Read-only: this tool cannot book anything; the user books through deep_link.
         """
-        return _run(tools.search_flights, client, origin, destination, date, return_date, adults, sort, limit)
+        return _run(tools.search_flights, client, origin, destination, date, return_date, adults, airlines, airline)
 
     @server.tool()
-    def search_multi_city(legs: list[dict], adults: int = 1, limit: int = 3) -> str:
+    def search_multi_city(legs: list[dict], adults: int = 1, airlines: int = 4) -> str:
         """Price a multi-city trip as separate one-way searches, one per leg.
 
         legs: a list of 2-6 objects like {"origin": "TLV", "destination": "TYO", "date": "2027-05-10"};
         origin/destination are search_codes (see search_locations), date is YYYY-MM-DD.
-        Returns the best `limit` offers of each leg and the cheapest combined total
+        A leg may also carry "airline": a 2-letter IATA code to show only that airline for that leg.
+        airlines: how many airlines to show per leg, 1-8 (default 4).
+
+        Each leg is shown like search_flights does: a header (offer count, number of airlines,
+        price range), the first `airlines` airline groups by cheapest offer with their cheapest and
+        fastest offer, and a last line "N more airlines: X, Y" naming the rest (ask again with that
+        leg's "airline" set to see one of them). Ends with the cheapest combined total
         (the cheapest offer of every leg added up). The legs are SEPARATE tickets, not one
         itinerary: say so to the user (no protection on a missed connection between legs).
         """
-        return _run(tools.search_multi_city, client, legs, adults, limit)
+        return _run(tools.search_multi_city, client, legs, adults, airlines)
 
     @server.tool()
     def get_deals() -> str:

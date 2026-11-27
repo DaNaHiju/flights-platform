@@ -23,16 +23,59 @@ and has no code path that sends anything but `GET`. The user books through the l
 | Tool | What it does |
 |---|---|
 | `search_locations(keyword)` | Airports and cities matching a name, with the `search_code` to use as origin/destination. |
-| `search_flights(origin, destination, date, return_date=None, adults=1, sort="best", limit=10)` | The best `limit` offers (one way, or round trip with `return_date`): price, airlines, local departure/arrival, duration, stops with airport and layover, checked bags, `deep_link`. Header with the number of offers and the price range. `sort` is `best`, `cheapest` or `fastest`. |
-| `search_multi_city(legs, adults=1, limit=3)` | One one-way search per leg, the best offers of each, and the cheapest combined total. The legs are separate tickets. |
+| `search_flights(origin, destination, date, return_date=None, adults=1, airlines=4, airline=None)` | Offers for one way, or a round trip with `return_date`, grouped by airline: the cheapest and the fastest offer of each of the first `airlines` airlines. `airline` (IATA code) shows only that airline. |
+| `search_multi_city(legs, adults=1, airlines=4)` | One one-way search per leg, shown the same way, and the cheapest combined total. A leg may carry `"airline": "AI"`. The legs are separate tickets. |
 | `get_deals()` | The current deals the worker found. |
+
+### Output format
+
+The API returns 70-170 offers per search, and one airline with many schedules (Etihad,
+say) can fill any "top N". So the tools do not show a top-N list. Each search (each leg, for
+`search_multi_city`) is shown like this:
+
+```text
+71 offers from 12 airlines, price range 2,580 ILS to 44,936 ILS.
+
+Airline 1: Aegean Airlines + Qatar Airways (A3 + QR), 1 offer
+cheapest and fastest: 2,580 ILS
+   <times, duration, stops with layovers, checked bags, deep_link>
+
+Airline 2: Etihad Airways (EY), 8 offers
+cheapest: 3,100 ILS
+   ...
+fastest: 3,134 ILS
+   ...
+
+...up to `airlines` groups...
+
+8 more airlines: ITA Airways, Etihad Airways + Korean Air, ...
+```
+
+- **Groups.** Offers are grouped by the airlines that fly them, in flight order. A mixed
+  itinerary is its own group: "Aegean Airlines + Qatar Airways" is not counted under Qatar
+  Airways. For a round trip the airlines of both directions are joined. The "N airlines" in
+  the header counts groups.
+- **Order.** Groups are ordered by their cheapest offer (ties: shorter trip, then name), and the
+  first `airlines` are shown (default 4, between 1 and 8; anything else is rejected).
+- **Two offers per group.** `cheapest` is the lowest price (ties: shorter trip). `fastest` is
+  the shortest total duration (ties: lower price). When one offer is both, it is shown once as
+  `cheapest and fastest`.
+- **The rest.** The last line names the groups that did not fit, so the model knows they exist
+  and can ask for them.
+- **One airline.** `airline="AI"` (2-character IATA code, any case) answers "and Air India?": it
+  returns the cheapest and the fastest offer among all offers where that airline flies at least
+  one flight, alone or in a mixed itinerary, even if it is not in the top. If it flies nothing
+  in the results, the answer lists the airlines that do. In `search_multi_city` the filter is
+  set per leg, and for the combined total that leg counts the filtered airline's cheapest offer.
+
+There is no `sort` or `limit`: the old `best` ranking and the top-N list are gone, because
+they are what let one airline take the whole answer.
 
 Notes for reading the output:
 
 - Times are **local to each airport**, as the API sends them; nothing is converted to your timezone. `(+1 day)` means it lands the next local day.
 - `checked bags: unknown` means the airline did not say. It is not "no bag".
-- `best` uses the same score as the web app (`bestScore` in `services/web/src/results.ts`): `price / cheapest + duration / shortest + 0.25 * stops`. Offers with the same flights are collapsed to the cheapest, like the web app does.
-- `limit` is capped at 20.
+- Offers with the same flights are collapsed to the cheapest, like the web app does (`dedupe` in `services/web/src/results.ts`).
 
 ## Install
 
@@ -92,7 +135,8 @@ On Windows the interpreter is `mcp\.venv\Scripts\python.exe`.
 
 ## Example requests
 
-- "Find me flights from Tel Aviv to Tokyo in May, leaving around the 10th and coming back around the 24th. Show me the cheapest and the best."
+- "Find me flights from Tel Aviv to Tokyo in May, leaving around the 10th and coming back around the 24th. Show me the cheapest and the fastest of each airline."
+- "And what does Air India have for that same flight?"
 - "I want to go TLV → Rome on 2027-03-04, Rome → Paris on 2027-03-08 and Paris → TLV on 2027-03-12. What is the cheapest way to do it?"
 - "What flight deals are there right now? Is the cheapest one still available this week?"
 

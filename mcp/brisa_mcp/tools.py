@@ -6,13 +6,22 @@ issue GET requests: there is no write path in this package.
 """
 import re
 
+from brisa_mcp.airlines import (
+    airline_name_for,
+    cheapest_of,
+    fastest_of,
+    group_by_airline,
+    offers_with_airline,
+)
 from brisa_mcp.client import BrisaClient, BrisaError
-from brisa_mcp.ranking import SORT_KEYS, dedupe, rank_one_way, rank_round_trip, sort_ranked
+from brisa_mcp.ranking import Ranked, dedupe, rank_one_way, rank_round_trip
 from brisa_mcp.summary import describe_offer, fmt_price, price_range
 
-MAX_LIMIT = 20  # the api returns ~170 offers (1 MB+); more than this is noise for a model
+DEFAULT_AIRLINES = 4  # airline groups shown per search
+MAX_AIRLINES = 8  # the api returns ~170 offers (1 MB+); more groups than this is noise for a model
 MAX_LEGS = 6  # each leg is one provider search against a limited quota
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_AIRLINE_CODE = re.compile(r"^[A-Za-z0-9]{2}$")
 
 
 def _check_date(name: str, value: str) -> None:
@@ -20,10 +29,18 @@ def _check_date(name: str, value: str) -> None:
         raise BrisaError(f"{name} must be formatted YYYY-MM-DD, got {value!r}.")
 
 
-def _check_limit(limit: int) -> int:
-    if limit < 1:
-        raise BrisaError("limit must be at least 1.")
-    return min(limit, MAX_LIMIT)
+def _check_airlines(airlines: int) -> int:
+    if not 1 <= airlines <= MAX_AIRLINES:
+        raise BrisaError(f"airlines must be between 1 and {MAX_AIRLINES}, got {airlines}.")
+    return airlines
+
+
+def _check_airline_code(code: str | None) -> str | None:
+    if code is None or code == "":
+        return None
+    if not _AIRLINE_CODE.match(code):
+        raise BrisaError(f"airline must be a 2-character IATA airline code such as 'AI' or 'EY', got {code!r}.")
+    return code.upper()
 
 
 def search_locations(client: BrisaClient, keyword: str) -> str:
@@ -50,6 +67,48 @@ def _search(client: BrisaClient, origin: str, destination: str, date: str, retur
     return dedupe([rank(o) for o in results])
 
 
+def _offer_roles(cheapest: Ranked, fastest: Ranked) -> list[str]:
+    if cheapest is fastest:
+        return [describe_offer("cheapest and fastest", cheapest)]
+    return [describe_offer("cheapest", cheapest), describe_offer("fastest", fastest)]
+
+
+def _airline_blocks(ranked: list[Ranked], airlines: int, airline: str | None) -> tuple[list[str], Ranked | None]:
+    """Text blocks for the airline view of one search, and the cheapest offer they contain.
+
+    Without *airline*: the first `airlines` airline groups by their cheapest offer, two offers
+    each (cheapest, fastest), then one line naming the groups that did not fit.
+    With *airline* (IATA code): only that airline's own cheapest and fastest offers, whether
+    or not it would have made the top.
+    """
+    groups = group_by_airline(ranked)
+    if airline:
+        matching = offers_with_airline(ranked, airline)
+        if not matching:
+            known = ", ".join(g.label for g in groups)
+            return [f"No offer includes airline {airline}. Airlines in these results: {known}."], None
+        cheapest, fastest = cheapest_of(matching), fastest_of(matching)
+        title = (f"{airline_name_for(matching, airline)} ({airline}): {len(matching)} of {len(ranked)} offers "
+                 f"include it, price range {price_range(matching)}")
+        return [title] + _offer_roles(cheapest, fastest), cheapest
+
+    shown = groups[:airlines]
+    blocks = []
+    for n, group in enumerate(shown, 1):
+        count = f"{len(group.offers)} offer{'s' if len(group.offers) != 1 else ''}"
+        first, *others = _offer_roles(group.cheapest, group.fastest)
+        blocks.append(f"Airline {n}: {group.label}, {count}\n{first}")  # the heading stays with its first offer
+        blocks += others
+    rest = groups[airlines:]
+    if rest:
+        blocks.append(f"{len(rest)} more airline{'s' if len(rest) != 1 else ''}: {', '.join(g.name for g in rest)}")
+    return blocks, shown[0].cheapest
+
+
+def _stats(ranked: list[Ranked]) -> str:
+    return f"{len(ranked)} offers from {len(group_by_airline(ranked))} airlines"
+
+
 def search_flights(
     client: BrisaClient,
     origin: str,
@@ -57,33 +116,36 @@ def search_flights(
     date: str,
     return_date: str | None = None,
     adults: int = 1,
-    sort: str = "best",
-    limit: int = 10,
+    airlines: int = DEFAULT_AIRLINES,
+    airline: str | None = None,
 ) -> str:
-    if sort not in SORT_KEYS:
-        raise BrisaError(f"sort must be one of {', '.join(SORT_KEYS)}, got {sort!r}.")
-    limit = _check_limit(limit)
+    airlines = _check_airlines(airlines)
+    airline = _check_airline_code(airline)
     ranked = _search(client, origin, destination, date, return_date, adults)
     trip = f"{origin} -> {destination} on {date}" + (f", returning {return_date}" if return_date else " (one way)")
     if not ranked:
         return f"No offers found for {trip}, {adults} adult(s)."
-    shown = sort_ranked(ranked, sort)[:limit]
+    blocks, _ = _airline_blocks(ranked, airlines, airline)
     header = (
-        f"{len(ranked)} offers for {trip}, {adults} adult(s). Price range: {price_range(ranked)}. "
-        f"Showing the top {len(shown)} by '{sort}'. Prices are the total for all passengers."
+        f"{_stats(ranked)} for {trip}, {adults} adult(s). Price range: {price_range(ranked)}. "
+        "Prices are the total for all passengers."
     )
-    return "\n\n".join([header] + [describe_offer(i, r) for i, r in enumerate(shown, 1)])
+    return "\n\n".join([header] + blocks)
 
 
-def search_multi_city(client: BrisaClient, legs: list[dict], adults: int = 1, limit: int = 3) -> str:
+def search_multi_city(client: BrisaClient, legs: list[dict], adults: int = 1, airlines: int = DEFAULT_AIRLINES) -> str:
     if not 2 <= len(legs) <= MAX_LEGS:
         raise BrisaError(f"legs must have between 2 and {MAX_LEGS} entries, got {len(legs)}.")
-    limit = _check_limit(limit)
-    sections, cheapest = [], []
+    airlines = _check_airlines(airlines)
+    sections, cheapest, filtered = [], [], False
     for n, leg in enumerate(legs, 1):
         missing = [k for k in ("origin", "destination", "date") if not leg.get(k)]
         if missing:
             raise BrisaError(f"leg {n} is missing {', '.join(missing)}.")
+        try:
+            airline = _check_airline_code(leg.get("airline"))
+        except BrisaError as e:
+            raise BrisaError(f"leg {n}: {e}") from None
         try:
             ranked = _search(client, leg["origin"], leg["destination"], leg["date"], None, adults)
         except BrisaError as e:
@@ -92,10 +154,11 @@ def search_multi_city(client: BrisaClient, legs: list[dict], adults: int = 1, li
         if not ranked:
             sections.append(f"{title}\nNo offers found.")
             continue
-        top = sort_ranked(ranked, "best")[:limit]
-        cheapest.append(min(ranked, key=lambda r: r.price))
-        sections.append("\n\n".join([f"{title}: {len(ranked)} offers, price range {price_range(ranked)}. Top {len(top)} by 'best':"]
-                                    + [describe_offer(i, r) for i, r in enumerate(top, 1)]))
+        blocks, leg_cheapest = _airline_blocks(ranked, airlines, airline)
+        if leg_cheapest is not None:
+            cheapest.append(leg_cheapest)
+        filtered = filtered or airline is not None
+        sections.append("\n\n".join([f"{title}: {_stats(ranked)}, price range {price_range(ranked)}."] + blocks))
     note = "Each leg is a separate one-way ticket: separate bookings, no protection if one is delayed or cancelled."
     if len(cheapest) < len(legs):
         total = "Cheapest combined total: unavailable, at least one leg has no offers."
@@ -104,7 +167,10 @@ def search_multi_city(client: BrisaClient, legs: list[dict], adults: int = 1, li
         if len(currencies) > 1:
             total = f"Cheapest combined total: not summed, the legs are priced in different currencies ({', '.join(sorted(currencies))})."
         else:
-            total = f"Cheapest combined total: {fmt_price(sum(r.price for r in cheapest), currencies.pop())} (the cheapest offer of each leg added up)."
+            what = "the cheapest offer of each leg added up"
+            if filtered:
+                what += "; a leg with an airline filter counts that airline's cheapest offer"
+            total = f"Cheapest combined total: {fmt_price(sum(r.price for r in cheapest), currencies.pop())} ({what})."
     return "\n\n".join(sections + [total, note])
 
 

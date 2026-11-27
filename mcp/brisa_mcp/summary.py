@@ -90,17 +90,18 @@ def describe_direction(offer: dict, indent: str = "   ") -> list[str]:
 
 
 
-def describe_offer(index: int, r: Ranked) -> str:
+def describe_offer(label: str, r: Ranked) -> str:
+    """One offer under a label such as "cheapest" or "cheapest and fastest"."""
     offer = r.item
     link = offer.get("deep_link") or "none"
     if "outbound" in offer:  # round trip
-        lines = [f"{index}. {fmt_price(offer['price'], offer['currency'])} round trip total",
+        lines = [f"{label}: {fmt_price(offer['price'], offer['currency'])} round trip total",
                  "   Outbound:"]
         lines += describe_direction(offer["outbound"], "     ")
         lines.append("   Return:")
         lines += describe_direction(offer["return"], "     ")
     else:
-        lines = [f"{index}. {fmt_price(offer['price'], offer['currency'])}"]
+        lines = [f"{label}: {fmt_price(offer['price'], offer['currency'])}"]
         lines += describe_direction(offer)
     lines.append(f"   deep_link: {link}")
     return "\n".join(lines)
