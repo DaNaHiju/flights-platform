@@ -1,11 +1,10 @@
-"""Ranking of offers: a Python port of services/web/src/results.ts.
+"""Normalising offers: a Python port of the helpers in services/web/src/results.ts.
 
-Kept in step with the web app so the model and the UI agree on what "best" means.
-Ported from results.ts: rankOneWay / rankRoundTrip / dedupe / bestScore / sortRanked.
+Ported from results.ts: rankOneWay / rankRoundTrip / dedupe. The "best" score and the
+sort orders of the web app are not ported: the MCP tools no longer show a top-N list,
+they show the cheapest and the fastest offer of each airline (see airlines.py).
 """
 from dataclasses import dataclass, field
-
-SORT_KEYS = ("best", "cheapest", "fastest")
 
 
 @dataclass
@@ -63,28 +62,3 @@ def dedupe(ranked: list[Ranked]) -> list[Ranked]:
         if seen is None or r.price < seen.price:
             cheapest[r.signature] = r
     return [r for r in ranked if r.signature is None or cheapest[r.signature] is r]
-
-
-def best_score(r: Ranked, min_price: float, min_duration: int) -> float:
-    """"Best" score, lower is better. Same formula as bestScore in results.ts:
-
-        price / cheapestPrice + duration / shortestDuration + 0.25 * stops
-
-    Price and duration are measured against the best value in the list; each stop
-    costs a quarter of that.
-    """
-    return r.price / min_price + r.duration / min_duration + 0.25 * r.stops
-
-
-def sort_ranked(ranked: list[Ranked], key: str) -> list[Ranked]:
-    """A new list in the order of *key*; ties fall back to price (or duration), as in sortRanked."""
-    if not ranked:
-        return []
-    min_price = min(r.price for r in ranked)
-    min_duration = min(r.duration for r in ranked)
-    by = {
-        "best": lambda r: (best_score(r, min_price, min_duration), r.price),
-        "cheapest": lambda r: (r.price, r.duration),
-        "fastest": lambda r: (r.duration, r.price),
-    }
-    return sorted(ranked, key=by[key])
